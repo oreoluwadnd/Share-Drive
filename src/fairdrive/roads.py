@@ -9,6 +9,8 @@ import pandas as pd
 from scipy.spatial import cKDTree
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+# overpass-api.de answers 406 to the default "Python-urllib" User-Agent, so name the app.
+USER_AGENT = "FairDrive/0.1 (student project; github.com/oreoluwadnd/Share-Drive)"
 DRIVABLE = "motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service"
 BBOX_PAD_DEG = 0.001  # about 100 m
 VERTEX_SPACING_M = 5.0
@@ -25,7 +27,7 @@ def fetch_roads(lat: np.ndarray, lon: np.ndarray) -> list[dict]:
     south, west = lat.min() - BBOX_PAD_DEG, lon.min() - BBOX_PAD_DEG
     north, east = lat.max() + BBOX_PAD_DEG, lon.max() + BBOX_PAD_DEG
     query = f'[out:json][timeout:120];way({south},{west},{north},{east})[highway~"^({DRIVABLE})(_link)?$"];out tags geom;'
-    request = urllib.request.Request(OVERPASS_URL, urllib.parse.urlencode({"data": query}).encode())
+    request = urllib.request.Request(OVERPASS_URL, urllib.parse.urlencode({"data": query}).encode(), {"User-Agent": USER_AGENT})
     with urllib.request.urlopen(request, timeout=180) as response:
         ways = json.load(response)["elements"]
     if not ways:
