@@ -7,6 +7,7 @@ dependencies = [
     "numpy>=2.5.4",
     "pandas>=3.0.6",
     "pyarrow>=26.0.0",
+    "scipy>=1.18.1",
 ]
 
 [project.scripts]

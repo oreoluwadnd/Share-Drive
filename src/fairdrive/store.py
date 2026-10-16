@@ -58,3 +58,11 @@ class TripStore:
 
     def points(self, trip_id: str) -> pd.DataFrame:
         return pd.read_parquet(self.trips_dir / f"{trip_id}.parquet")
+
+    def details(self, trip_id: str) -> dict:
+        return json.loads((self.trips_dir / f"{trip_id}.json").read_text())
+
+    def update(self, trip_id: str, details: dict, points: pd.DataFrame) -> None:
+        """Replace a trip's details and points (used when adding tags)."""
+        points.to_parquet(self.trips_dir / f"{trip_id}.parquet")
+        (self.trips_dir / f"{trip_id}.json").write_text(json.dumps(details, indent=2))

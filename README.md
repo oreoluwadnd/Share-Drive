@@ -19,7 +19,10 @@ uv run fairdrive trips                                # list trips (flagged ones
 uv run fairdrive baseline                             # naive event-count score per driver
 uv run fairdrive load-uah path/to/UAH-DRIVESET-v1     # load the UAH-DriveSet public dataset
 uv run fairdrive summary                              # drivers, trips and km per source
+uv run fairdrive tag                                  # road type, speed limit, time of day, weather (needs internet)
 ```
+
+`tag` can be re-run any time. It skips trips that are done and fills in weather that Environment Canada hadn't published yet (it runs a few days behind).
 
 For UAH-DriveSet only the `.txt` files are needed (about 13 MB zipped, versus 3.5 GB with videos):
 
