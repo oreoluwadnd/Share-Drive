@@ -151,3 +151,40 @@ def test_scores_are_0_to_100_and_harsh_driver_scores_lower(tmp_path, store):
     scores = driver_scores(store).set_index("driver")
     assert scores["score"].between(0, 100).all()
     assert scores.loc["calm", "score"] > scores.loc["harsh", "score"]
+
+
+# FD-13: Load public driving datasets
+
+def write_uah_trip(root, driver, name, seconds=300):
+    """A minimal UAH-DriveSet trip folder: steady 15 m/s due north with one hard brake."""
+    folder = root / driver / name
+    folder.mkdir(parents=True)
+    t_acc = np.arange(0, seconds, 0.1)
+    forward_g = np.where((t_acc > 150) & (t_acc < 152), -0.4, 0.0)
+    acc = np.column_stack([t_acc, np.ones_like(t_acc), np.zeros_like(t_acc), np.zeros_like(t_acc), forward_g, np.zeros((len(t_acc), 6))])
+    np.savetxt(folder / "RAW_ACCELEROMETERS.txt", acc, fmt="%.3f")
+    t_gps = np.arange(0, seconds, 1.0)
+    lat = 40.5 + 15 * t_gps / 111_195
+    gps = np.column_stack([t_gps, np.full_like(t_gps, 54.0), lat, np.full_like(t_gps, -3.4), np.zeros((len(t_gps), 8))])
+    np.savetxt(folder / "RAW_GPS.txt", gps, fmt="%.6f")
+
+
+def test_uah_trips_convert_to_trip_format_and_summarise(tmp_path, store):
+    from fairdrive.uah import load_dataset
+    root = tmp_path / "UAH-DRIVESET-v1"
+    write_uah_trip(root, "D1", "20151110175712-16km-D1-NORMAL1-SECONDARY")
+    write_uah_trip(root, "D2", "20151120160904-16km-D2-NORMAL1-SECONDARY")
+    trip_ids = load_dataset(root, store)
+
+    assert trip_ids == ["uah-D1-20151110T165712Z", "uah-D2-20151120T150904Z"]  # Madrid local time to UTC
+    points = store.points(trip_ids[0])
+    assert list(points.columns) == POINT_COLUMNS
+    assert points["speed"].round(1).eq(15.0).all()
+    assert count_events(points)["hard_brake"] == 1
+
+    path, _ = recording(tmp_path, synthetic.city_drive(5))
+    upload(path, "ana", store)
+    summary = store.summary().set_index("source")
+    assert summary.loc["uah-driveset", ["drivers", "trips"]].tolist() == [2, 2]
+    assert summary.loc["sensorlogger", ["drivers", "trips"]].tolist() == [1, 1]
+    assert summary.loc["uah-driveset", "km"] == pytest.approx(2 * (4.5 - 1.0), abs=0.1)

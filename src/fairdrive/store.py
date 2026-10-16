@@ -26,7 +26,7 @@ class TripStore:
     def exists(self, trip_id: str) -> bool:
         return (self.trips_dir / f"{trip_id}.json").exists()
 
-    def save(self, driver: str, trip: Trip) -> str:
+    def save(self, driver: str, trip: Trip, source: str) -> str:
         trip_id = self.trip_id(driver, trip)
         self.trips_dir.mkdir(parents=True, exist_ok=True)
         distance_km = 0.0
@@ -36,6 +36,7 @@ class TripStore:
         details = {
             "trip_id": trip_id,
             "driver": driver,
+            "source": source,
             "start": trip.start.isoformat(),
             "duration_min": round((trip.end - trip.start).total_seconds() / 60, 1),
             "distance_km": round(distance_km, 2),
@@ -46,7 +47,14 @@ class TripStore:
 
     def list(self) -> pd.DataFrame:
         rows = [json.loads(p.read_text()) for p in sorted(self.trips_dir.glob("*.json"))]
-        return pd.DataFrame(rows, columns=["trip_id", "driver", "start", "duration_min", "distance_km", "flag"])
+        return pd.DataFrame(rows, columns=["trip_id", "driver", "source", "start", "duration_min", "distance_km", "flag"])
+
+    def summary(self) -> pd.DataFrame:
+        """Drivers, trips and kilometres (of stored points) per source."""
+        trips = self.list()
+        return trips.groupby("source").agg(
+            drivers=("driver", "nunique"), trips=("trip_id", "size"), km=("distance_km", "sum")
+        ).round(1).reset_index()
 
     def points(self, trip_id: str) -> pd.DataFrame:
         return pd.read_parquet(self.trips_dir / f"{trip_id}.parquet")

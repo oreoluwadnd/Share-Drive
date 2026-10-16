@@ -9,6 +9,8 @@ from fairdrive.sensorlogger import read_recording
 from fairdrive.store import TripStore
 from fairdrive.trips import process_recording
 
+SOURCE = "sensorlogger"
+
 
 def upload(path: Path, driver: str, store: TripStore) -> list[str]:
     """Return the ids of the saved trips. Nothing is saved if the file is invalid."""
@@ -16,4 +18,4 @@ def upload(path: Path, driver: str, store: TripStore) -> list[str]:
     duplicates = [store.trip_id(driver, t) for t in trips if store.exists(store.trip_id(driver, t))]
     if duplicates:
         raise FileExistsError(f"Trip(s) already uploaded: {', '.join(duplicates)}")
-    return [store.save(driver, trip) for trip in trips]
+    return [store.save(driver, trip, SOURCE) for trip in trips]

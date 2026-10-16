@@ -48,12 +48,12 @@ def build_timeline(acc: pd.DataFrame, gravity: pd.DataFrame, gps: pd.DataFrame) 
     timeline[["ax", "ay", "az"]] = acc.reindex(index).interpolate(limit_direction="both").to_numpy()
     timeline[["gx", "gy", "gz"]] = gravity.reindex(index).interpolate(limit_direction="both").to_numpy()
 
-    timeline["lat"] = _interp(index, gps["latitude"])
-    timeline["lon"] = _interp(index, gps["longitude"])
-    timeline["speed"] = _interp(index, gps["speed"].where(gps["speed"] >= 0))
+    timeline["lat"] = interp_onto(index, gps["latitude"])
+    timeline["lon"] = interp_onto(index, gps["longitude"])
+    timeline["speed"] = interp_onto(index, gps["speed"].where(gps["speed"] >= 0))
     bearing = gps["bearing"].where(gps["bearing"] >= 0).dropna()
     heading = pd.Series(np.unwrap(np.radians(bearing.to_numpy())), index=bearing.index)
-    timeline["heading"] = _interp(index, heading)
+    timeline["heading"] = interp_onto(index, heading)
     return timeline
 
 
@@ -70,11 +70,15 @@ def split_trips(timeline: pd.DataFrame) -> list[pd.DataFrame]:
 
 def _make_trip(segment: pd.DataFrame, fix_times: pd.DatetimeIndex) -> Trip:
     start, end = segment.index[0], segment.index[-1]
-    flag = _flag(start, end, fix_times)
+    flag = flag_reason(start, end, fix_times)
     if flag:
         return Trip(start, end, flag, None)
-
     points = pd.concat([segment[["lat", "lon", "speed"]], to_car_frame(segment)], axis=1)
+    return hide_ends(start, end, points)
+
+
+def hide_ends(start: pd.Timestamp, end: pd.Timestamp, points: pd.DataFrame) -> Trip:
+    """Drop the first and last HIDDEN_END_M of a cleaned trip. Flags it if nothing would be left."""
     distance = np.cumsum(step_distances_m(points["lat"].to_numpy(), points["lon"].to_numpy()))
     if distance[-1] < 2 * HIDDEN_END_M:
         return Trip(start, end, f"shorter than {2 * HIDDEN_END_M / 1000:g} km", None)
@@ -82,7 +86,8 @@ def _make_trip(segment: pd.DataFrame, fix_times: pd.DatetimeIndex) -> Trip:
     return Trip(start, end, None, points[keep][POINT_COLUMNS])
 
 
-def _flag(start: pd.Timestamp, end: pd.Timestamp, fix_times: pd.DatetimeIndex) -> str | None:
+def flag_reason(start: pd.Timestamp, end: pd.Timestamp, fix_times: pd.DatetimeIndex) -> str | None:
+    """Why a trip can't be scored, or None if it can."""
     if end - start < MIN_DURATION:
         return f"shorter than {MIN_DURATION.total_seconds() / 60:g} minutes"
     fixes = fix_times[(fix_times >= start) & (fix_times <= end)]
@@ -92,6 +97,7 @@ def _flag(start: pd.Timestamp, end: pd.Timestamp, fix_times: pd.DatetimeIndex) -
     return None
 
 
-def _interp(index: pd.DatetimeIndex, values: pd.Series) -> np.ndarray:
+def interp_onto(index: pd.DatetimeIndex, values: pd.Series) -> np.ndarray:
+    """Linear interpolation of a time series onto index, ignoring missing values."""
     values = values.dropna()
     return np.interp(index.asi8, values.index.as_unit("ns").asi8, values.to_numpy())
