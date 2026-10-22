@@ -1,0 +1,10 @@
+# High-contrast theme: every text colour below meets WCAG 2.1 AA (4.5:1) on its background.
+[theme]
+base = "light"
+primaryColor = "#1d6b48"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f1f4f2"
+textColor = "#141614"
+
+[browser]
+gatherUsageStats = false

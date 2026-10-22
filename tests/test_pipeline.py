@@ -2,7 +2,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from fairdrive.baseline import count_events, driver_scores
+from fairdrive.baseline import driver_scores
+from fairdrive.events import count_events
 from fairdrive.cli import main
 from fairdrive.sensorlogger import MissingColumnError
 from fairdrive.store import TripStore
@@ -145,7 +146,7 @@ def test_noise_around_threshold_counts_once():
 
 def test_scores_are_0_to_100_and_harsh_driver_scores_lower(tmp_path, store):
     calm = synthetic.city_drive(5)
-    harsh = [(4, 3.6, 0), (15, 0, 0), (6, 0, 25), (10, 0, 0), (3, -4.8, 0), (2, 0, 0)] * 5
+    harsh = [(4, 3.6, 0), (25, 0, 0), (2, 0, 20), (10, 0, 0), (3, -4.8, 0), (2, 0, 0)] * 5  # 2 s sharp turns: realistic
     upload(recording(tmp_path, calm, name="calm.json")[0], "calm", store)
     upload(recording(tmp_path, harsh, name="harsh.json", seed=4)[0], "harsh", store)
     scores = driver_scores(store).set_index("driver")
@@ -167,6 +168,8 @@ def write_uah_trip(root, driver, name, seconds=300):
     lat = 40.5 + 15 * t_gps / 111_195
     gps = np.column_stack([t_gps, np.full_like(t_gps, 54.0), lat, np.full_like(t_gps, -3.4), np.zeros((len(t_gps), 8))])
     np.savetxt(folder / "RAW_GPS.txt", gps, fmt="%.6f")
+    osm = [f"{t:.2f} 120.0 1 motorway 3 1 {la:.6f} -3.4 0.5 54.0" for t, la in zip(t_gps[::2], lat[::2])]
+    (folder / "PROC_OPENSTREETMAP_DATA.txt").write_text("\n".join(osm) + "\n")
 
 
 def test_uah_trips_convert_to_trip_format_and_summarise(tmp_path, store):
@@ -178,7 +181,8 @@ def test_uah_trips_convert_to_trip_format_and_summarise(tmp_path, store):
 
     assert trip_ids == ["uah-D1-20151110T165712Z", "uah-D2-20151120T150904Z"]  # Madrid local time to UTC
     points = store.points(trip_ids[0])
-    assert list(points.columns) == POINT_COLUMNS
+    assert list(points.columns) == [*POINT_COLUMNS, "road_type", "speed_limit_kmh", "speed_limit_source"]
+    assert points["road_type"].eq("motorway").all() and points["speed_limit_kmh"].eq(120).all()
     assert points["speed"].round(1).eq(15.0).all()
     assert count_events(points)["hard_brake"] == 1
 

@@ -15,6 +15,10 @@ MIN_DURATION = pd.Timedelta(minutes=2)
 MAX_GPS_GAP = pd.Timedelta(seconds=30)
 # Distance cut from each end of a trip so home and work locations stay private.
 HIDDEN_END_M = 500.0
+# A car can't push sideways this hard for long. In UAH-DriveSet two recordings spent 21% and 45%
+# of the trip above 0.3 g sideways (the phone moved or the sensor failed); all others under 0.2%.
+SIDEWAYS_LIMIT_MS2 = 0.3 * 9.80665
+MAX_SIDEWAYS_SHARE = 0.05
 
 POINT_COLUMNS = ["lat", "lon", "speed", "acc_forward", "acc_lateral", "acc_vertical"]
 
@@ -74,16 +78,18 @@ def _make_trip(segment: pd.DataFrame, fix_times: pd.DatetimeIndex) -> Trip:
     if flag:
         return Trip(start, end, flag, None)
     points = pd.concat([segment[["lat", "lon", "speed"]], to_car_frame(segment)], axis=1)
-    return hide_ends(start, end, points)
+    return finish_trip(start, end, points)
 
 
-def hide_ends(start: pd.Timestamp, end: pd.Timestamp, points: pd.DataFrame) -> Trip:
-    """Drop the first and last HIDDEN_END_M of a cleaned trip. Flags it if nothing would be left."""
+def finish_trip(start: pd.Timestamp, end: pd.Timestamp, points: pd.DataFrame) -> Trip:
+    """Flag a cleaned trip with impossible sideways readings, otherwise drop its first and last HIDDEN_END_M."""
+    if (points["acc_lateral"].abs() > SIDEWAYS_LIMIT_MS2).mean() > MAX_SIDEWAYS_SHARE:
+        return Trip(start, end, "sideways readings impossible for a car (phone moved?)", None)
     distance = np.cumsum(step_distances_m(points["lat"].to_numpy(), points["lon"].to_numpy()))
     if distance[-1] < 2 * HIDDEN_END_M:
         return Trip(start, end, f"shorter than {2 * HIDDEN_END_M / 1000:g} km", None)
     keep = (distance >= HIDDEN_END_M) & (distance <= distance[-1] - HIDDEN_END_M)
-    return Trip(start, end, None, points[keep][POINT_COLUMNS])
+    return Trip(start, end, None, points[keep])
 
 
 def flag_reason(start: pd.Timestamp, end: pd.Timestamp, fix_times: pd.DatetimeIndex) -> str | None:

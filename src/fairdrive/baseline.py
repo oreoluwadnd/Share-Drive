@@ -1,43 +1,33 @@
-"""Naive baseline: count harsh events with fixed thresholds, ignoring road, time and weather."""
+"""Naive baseline: harsh events per km compared with the average trip, ignoring road, time and weather."""
 
 import pandas as pd
 
+from fairdrive.events import EVENT_TYPES, count_events
+from fairdrive.scale import halving_score
 from fairdrive.store import TripStore
 
-G = 9.80665
-# Fixed thresholds (0.3 g each). Starting values for comparison, not tuned.
-HARD_BRAKE_MS2 = 0.3 * G
-HARD_ACCEL_MS2 = 0.3 * G
-HARD_CORNER_MS2 = 0.3 * G
-# Threshold crossings closer together than this are one event (noise around the threshold).
-MERGE_WITHIN = "1s"
-# Points lost per harsh event per 100 km. A driver with 50+ events per 100 km scores 0.
-PENALTY_PER_EVENT_PER_100KM = 2.0
 
-
-def count_events(points: pd.DataFrame) -> dict[str, int]:
-    """Each stretch past a threshold counts as one event, merging stretches less than MERGE_WITHIN apart."""
-    return {
-        "hard_brake": _runs(points["acc_forward"] <= -HARD_BRAKE_MS2),
-        "hard_accel": _runs(points["acc_forward"] >= HARD_ACCEL_MS2),
-        "hard_corner": _runs(points["acc_lateral"].abs() >= HARD_CORNER_MS2),
-    }
+def trip_scores(store: TripStore) -> pd.DataFrame:
+    """One row per scorable trip. score is 50 at the average events per km of all stored trips, 100 with none."""
+    trips = store.list()
+    trips = trips[trips["flag"].isna()]
+    rows = [{"trip_id": t.trip_id, "driver": t.driver, "distance_km": t.distance_km, **count_events(store.points(t.trip_id))}
+            for t in trips.itertuples()]
+    scores = pd.DataFrame(rows, columns=["trip_id", "driver", "distance_km", *EVENT_TYPES])
+    scores["events_per_km"] = scores[list(EVENT_TYPES)].sum(axis=1) / scores["distance_km"]
+    if scores.empty:
+        return scores.assign(score=pd.Series(dtype=float))
+    average = scores[list(EVENT_TYPES)].sum().sum() / scores["distance_km"].sum()
+    scores["score"] = halving_score(scores["events_per_km"], average).round(1)
+    return scores
 
 
 def driver_scores(store: TripStore) -> pd.DataFrame:
-    """One row per driver with event counts and a 0 to 100 score. Flagged trips are skipped."""
-    trips = store.list()
-    trips = trips[trips["flag"].isna()]
-    rows = [{"driver": t.driver, "distance_km": t.distance_km, **count_events(store.points(t.trip_id))} for t in trips.itertuples()]
-    per_trip = pd.DataFrame(rows, columns=["driver", "distance_km", "hard_brake", "hard_accel", "hard_corner"])
-    scores = per_trip.groupby("driver").sum()
-    scores.insert(0, "trips", per_trip.groupby("driver").size())
-    events = scores[["hard_brake", "hard_accel", "hard_corner"]].sum(axis=1)
-    scores["events_per_100km"] = (100 * events / scores["distance_km"]).round(1)
-    scores["score"] = (100 - PENALTY_PER_EVENT_PER_100KM * scores["events_per_100km"]).clip(0, 100).round(1)
-    return scores.reset_index()
-
-
-def _runs(above: pd.Series) -> int:
-    recently_above = above.shift(fill_value=False).astype(float).rolling(MERGE_WITHIN).max() == 1
-    return int((above & ~recently_above).sum())
+    """One row per driver: totals, events per 100 km and the average of their trip scores."""
+    trips = trip_scores(store)
+    drivers = trips.groupby("driver").agg(
+        trips=("trip_id", "size"), distance_km=("distance_km", "sum"),
+        **{kind: (kind, "sum") for kind in EVENT_TYPES}, score=("score", "mean"),
+    )
+    drivers.insert(len(drivers.columns) - 1, "events_per_100km", (100 * drivers[list(EVENT_TYPES)].sum(axis=1) / drivers["distance_km"]).round(1))
+    return drivers.round({"distance_km": 1, "score": 1}).reset_index()

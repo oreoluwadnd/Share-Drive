@@ -6,6 +6,9 @@ removed. Axis directions were measured on all 40 trips, against GPS speed and
 turns and against the dataset's own braking and turning events:
 Z is forward (+ = speeding up), Y is sideways (+ = right), X is vertical
 (its sign was not verified).
+
+Roads and speed limits come from the dataset's own OpenStreetMap readings (PROC_OPENSTREETMAP_DATA,
+one every ~1.7 s, recorded in 2015 when the trips were driven), so these trips need no map lookup.
 """
 
 from datetime import datetime
@@ -15,7 +18,7 @@ import numpy as np
 import pandas as pd
 
 from fairdrive.store import TripStore
-from fairdrive.trips import STEP, Trip, flag_reason, hide_ends, interp_onto
+from fairdrive.trips import STEP, Trip, finish_trip, flag_reason, interp_onto
 
 SOURCE = "uah-driveset"
 G = 9.80665
@@ -23,9 +26,14 @@ G = 9.80665
 TIMEZONE = "Europe/Madrid"
 
 
-def load_trip(folder: Path) -> tuple[str, Trip]:
-    """Return (driver, trip) for one trip folder, e.g. D1/20151110175712-16km-D1-NORMAL1-SECONDARY."""
+def load_trip(folder: Path) -> tuple[str, Trip, dict]:
+    """Return (driver, trip, labels) for one trip folder, e.g. D1/20151110175712-16km-D1-NORMAL1-SECONDARY.
+
+    labels holds the dataset's driving style (normal, aggressive, drowsy) and route (motorway, secondary).
+    """
     driver = f"uah-{folder.parent.name}"
+    _, _, _, style, route = folder.name.split("-")
+    labels = {"style": style.rstrip("12").lower(), "route": route.lower()}
     start = pd.Timestamp(datetime.strptime(folder.name[:14], "%Y%m%d%H%M%S"), tz=TIMEZONE).tz_convert("UTC")
 
     # RAW_ACCELEROMETERS: seconds, activation, x, y, z (G), ...
@@ -47,10 +55,26 @@ def load_trip(folder: Path) -> tuple[str, Trip]:
         "acc_lateral": acc["y"].to_numpy(),
         "acc_vertical": acc["x"].to_numpy(),
     }, index=index)
+    points = points.join(_roads(folder, start, index))
 
     flag = flag_reason(index[0], index[-1], gps.index)
-    trip = Trip(index[0], index[-1], flag, None) if flag else hide_ends(index[0], index[-1], points)
-    return driver, trip
+    trip = Trip(index[0], index[-1], flag, None) if flag else finish_trip(index[0], index[-1], points)
+    return driver, trip, labels
+
+
+def _roads(folder: Path, start: pd.Timestamp, index: pd.DatetimeIndex) -> pd.DataFrame:
+    """road_type, speed_limit_kmh and speed_limit_source at each point, from the nearest dataset reading."""
+    # PROC_OPENSTREETMAP_DATA: seconds, maxspeed (-1 = unknown), reliability, road type ("-" = unknown), ...
+    osm = pd.read_csv(folder / "PROC_OPENSTREETMAP_DATA.txt", sep=r"\s+", header=None, usecols=[0, 1, 3], names=["s", "maxspeed", "road"])
+    osm.index = pd.DatetimeIndex(start + pd.to_timedelta(osm.pop("s"), unit="s")).as_unit("ns")
+    osm = osm[~osm.index.duplicated()].sort_index()
+    nearest = osm.reindex(index, method="nearest")
+    known = nearest["maxspeed"] > 0
+    return pd.DataFrame({
+        "road_type": nearest["road"].where(nearest["road"] != "-"),
+        "speed_limit_kmh": nearest["maxspeed"].where(known),
+        "speed_limit_source": np.where(known, "posted", "missing"),
+    }, index=index)
 
 
 def load_dataset(root: Path, store: TripStore) -> list[str]:
@@ -59,7 +83,7 @@ def load_dataset(root: Path, store: TripStore) -> list[str]:
     if not folders:
         raise FileNotFoundError(f"No UAH-DriveSet trips found under {root}")
     trips = [load_trip(folder) for folder in folders]
-    duplicates = [store.trip_id(d, t) for d, t in trips if store.exists(store.trip_id(d, t))]
+    duplicates = [store.trip_id(d, t) for d, t, _ in trips if store.exists(store.trip_id(d, t))]
     if duplicates:
         raise FileExistsError(f"Trip(s) already loaded: {', '.join(duplicates)}")
-    return [store.save(driver, trip, SOURCE) for driver, trip in trips]
+    return [store.save(driver, trip, SOURCE, labels) for driver, trip, labels in trips]
