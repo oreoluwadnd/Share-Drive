@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -7,8 +8,9 @@ from pathlib import Path
 import pandas as pd
 
 from fairdrive.baseline import driver_scores
+from fairdrive.braking import study
 from fairdrive.compare import comparison
-from fairdrive.model import train
+from fairdrive.model import model_dir, train
 from fairdrive.scoring import score_trips
 from fairdrive.sensorlogger import MissingColumnError
 from fairdrive.stability import stability
@@ -35,6 +37,8 @@ def main(argv: list[str] | None = None) -> None:
     commands.add_parser("summary", help="drivers, trips and kilometres per source")
     commands.add_parser("baseline", help="naive event-count score per driver")
     commands.add_parser("train", help="test the context model on held-out drivers, then save it")
+    braking_cmd = commands.add_parser("braking-study", help="can the phone tell planned stops from panic stops? (UAH-DriveSet)")
+    braking_cmd.add_argument("folder", type=Path, help="the UAH-DRIVESET-v1 folder")
     commands.add_parser("scores", help="FairDrive driving and conditions scores per trip")
     compare_cmd = commands.add_parser("compare", help="FairDrive vs baseline by driver group")
     compare_cmd.add_argument("--csv", type=Path, help="also save the table as CSV")
@@ -68,6 +72,14 @@ def main(argv: list[str] | None = None) -> None:
         print(f"Held out each of {e['drivers']} drivers in turn ({e['segments_km']} km).")
         print(f"Error (mean Poisson deviance): model {e['model_error']}, simple average {e['average_error']}.")
         print(f"The model is {e['improvement_pct']}% better than the simple average (target: at least 10%).")
+    elif args.command == "braking-study":
+        result = study(args.folder)
+        path = model_dir(store) / "braking_study.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(result, indent=2))
+        print(f"{result['hard_brakes']} hard brakes from {result['drivers']} drivers, {result['reactive']} reactive.")
+        print(f"Macro F1 on drivers it never saw: {result['macro_f1']} (always guessing the common label: "
+              f"{result['always_majority_macro_f1']}, target: {result['target_macro_f1']}). Saved {path}")
     elif args.command == "scores":
         scores = score_trips(store)
         columns = ["trip_id", "km", "observed", "expected", "driving_score", "conditions_score", "baseline_score"]
