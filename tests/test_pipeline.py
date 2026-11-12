@@ -1,3 +1,5 @@
+import zipfile
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -5,7 +7,7 @@ import pytest
 from fairdrive.baseline import driver_scores
 from fairdrive.events import count_events
 from fairdrive.cli import main
-from fairdrive.sensorlogger import MissingColumnError
+from fairdrive.sensorlogger import MissingColumnError, RecordingError
 from fairdrive.store import TripStore
 from fairdrive.trips import HIDDEN_END_M, POINT_COLUMNS
 from fairdrive.upload import upload
@@ -17,7 +19,7 @@ def store(tmp_path):
     return TripStore(tmp_path / "data")
 
 
-def recording(tmp_path, phases, platform="android", seed=0, gps_gap=None, name="trip.json"):
+def recording(tmp_path, phases, platform="android", seed=0, gps_gap=None, name="trip.zip"):
     truth = synthetic.simulate(phases, seed=seed)
     path = synthetic.write(synthetic.to_records(truth, platform, seed, gps_gap), tmp_path / name)
     return path, truth
@@ -48,17 +50,42 @@ def test_missing_column_names_it_and_saves_nothing(tmp_path, store, drop, expect
         for r in records:
             if r["sensor"] == sensor:
                 del r[column]
-    path = synthetic.write(records, tmp_path / "bad.json")
+    path = synthetic.write(records, tmp_path / "bad.zip")
 
     with pytest.raises(MissingColumnError, match=expected):
         upload(path, "ana", store)
     assert not store.root.exists()
 
 
+def test_phone_model_and_platform_are_saved_with_the_trip(tmp_path, store):
+    path, _ = recording(tmp_path, synthetic.city_drive(5), platform="ios")
+    [trip_id] = upload(path, "ana", store)
+    assert store.details(trip_id)["phone"] == {"device": "Test ios phone", "platform": "ios"}
+
+
+def test_empty_location_file_says_what_to_check(tmp_path, store):
+    """What happened to our first real drive: location permission off, Location.csv 0 bytes."""
+    path, _ = recording(tmp_path, synthetic.city_drive(3))
+    empty = tmp_path / "no-gps.zip"
+    with zipfile.ZipFile(path) as source, zipfile.ZipFile(empty, "w") as target:
+        for name in source.namelist():
+            target.writestr(name, b"" if name == "Location.csv" else source.read(name))
+    with pytest.raises(RecordingError, match="No readings in Location.*Always"):
+        upload(empty, "ana", store)
+    assert not store.root.exists()
+
+
+def test_a_file_that_is_not_a_zip_is_rejected(tmp_path, store):
+    path = tmp_path / "trip.json"
+    path.write_text("[]")
+    with pytest.raises(RecordingError, match="not a Sensor Logger zip export"):
+        upload(path, "ana", store)
+
+
 def test_cli_reports_missing_column(tmp_path, store):
     truth = synthetic.simulate(synthetic.city_drive(3))
     records = [r for r in synthetic.to_records(truth) if r["sensor"] != "Gravity"]
-    path = synthetic.write(records, tmp_path / "bad.json")
+    path = synthetic.write(records, tmp_path / "bad.zip")
     with pytest.raises(SystemExit, match="Missing column\\(s\\): Gravity.time, Gravity.x"):
         main(["--data-dir", str(store.root), "upload", str(path), "--driver", "ana"])
 
@@ -105,6 +132,15 @@ def test_gps_gap_over_30_seconds_is_flagged(tmp_path, store):
     assert store.list()["flag"].tolist() == ["GPS gap over 30 seconds"]
 
 
+def test_motion_gap_is_flagged_not_filled_in(tmp_path, store):
+    """Our first real recording: iOS paused the app, so motion readings stopped while the drive went on."""
+    truth = synthetic.simulate(synthetic.city_drive(5))
+    paused = lambda r: r["sensor"] in ("Accelerometer", "Gravity") and 120 <= float(r["seconds_elapsed"]) < 125
+    records = [r for r in synthetic.to_records(truth) if not paused(r)]
+    upload(synthetic.write(records, tmp_path / "paused.zip"), "ana", store)
+    assert store.list()["flag"].tolist() == ["motion readings missing for over 2 seconds (app paused?)"]
+
+
 # FD-14: Hide trip start and end points
 
 def test_first_and_last_500m_are_removed(tmp_path, store):
@@ -147,8 +183,8 @@ def test_noise_around_threshold_counts_once():
 def test_scores_are_0_to_100_and_harsh_driver_scores_lower(tmp_path, store):
     calm = synthetic.city_drive(5)
     harsh = [(4, 3.6, 0), (25, 0, 0), (2, 0, 20), (10, 0, 0), (3, -4.8, 0), (2, 0, 0)] * 5  # 2 s sharp turns: realistic
-    upload(recording(tmp_path, calm, name="calm.json")[0], "calm", store)
-    upload(recording(tmp_path, harsh, name="harsh.json", seed=4)[0], "harsh", store)
+    upload(recording(tmp_path, calm, name="calm.zip")[0], "calm", store)
+    upload(recording(tmp_path, harsh, name="harsh.zip", seed=4)[0], "harsh", store)
     scores = driver_scores(store).set_index("driver")
     assert scores["score"].between(0, 100).all()
     assert scores.loc["calm", "score"] > scores.loc["harsh", "score"]

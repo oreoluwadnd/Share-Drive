@@ -1,10 +1,10 @@
-"""Simulated Sensor Logger JSON exports with a known ground truth.
+"""Simulated Sensor Logger zip exports with a known ground truth.
 
 A drive is a list of phases: (seconds, forward acceleration m/s², turn rate deg/s,
 positive = clockwise/right). The phone sits in a random fixed mount position.
 """
 
-import json
+import zipfile
 from pathlib import Path
 
 import numpy as np
@@ -51,7 +51,7 @@ def mount(seed: int) -> np.ndarray:
 
 
 def to_records(truth: pd.DataFrame, platform: str = "android", seed: int = 0, gps_gap: tuple[float, float] | None = None) -> list[dict]:
-    """Sensor Logger records. iOS flips the sign of acceleration and gravity."""
+    """Sensor Logger records, one per row of each sensor's CSV. iOS flips the sign of acceleration and gravity."""
     m = mount(seed)
     forward, left, up = m[:, 0], m[:, 1], m[:, 2]
     sign = -1.0 if platform == "ios" else 1.0
@@ -60,7 +60,7 @@ def to_records(truth: pd.DataFrame, platform: str = "android", seed: int = 0, gp
     gravity = sign * G * up
     times = START_NS + (truth["t"].to_numpy() * 1e9).round().astype("int64")
 
-    records = []
+    records = [{"sensor": "Metadata", "device name": f"Test {platform} phone", "platform": platform}]
     for i, ns in enumerate(times):
         records.append({"sensor": "Accelerometer", "time": str(ns), "seconds_elapsed": f"{truth['t'].iat[i]}", "z": str(acc[i, 2]), "y": str(acc[i, 1]), "x": str(acc[i, 0])})
     for i, ns in enumerate(times):
@@ -79,7 +79,13 @@ def to_records(truth: pd.DataFrame, platform: str = "android", seed: int = 0, gp
 
 
 def write(records: list[dict], path: Path) -> Path:
-    path.write_text(json.dumps(records))
+    """A zip with one CSV per sensor, as Sensor Logger exports it."""
+    by_sensor: dict[str, list[dict]] = {}
+    for record in records:
+        by_sensor.setdefault(record["sensor"], []).append({k: v for k, v in record.items() if k != "sensor"})
+    with zipfile.ZipFile(path, "w") as archive:
+        for sensor, rows in by_sensor.items():
+            archive.writestr(f"{sensor}.csv", pd.DataFrame(rows).to_csv(index=False))
     return path
 
 

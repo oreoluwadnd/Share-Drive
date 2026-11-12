@@ -26,8 +26,9 @@ class TripStore:
     def exists(self, trip_id: str) -> bool:
         return (self.trips_dir / f"{trip_id}.json").exists()
 
-    def save(self, driver: str, trip: Trip, source: str, labels: dict | None = None) -> str:
-        """labels: optional known facts about the trip, such as a dataset's driving style."""
+    def save(self, driver: str, trip: Trip, source: str, labels: dict | None = None, phone: dict | None = None) -> str:
+        """labels: optional known facts about the trip, such as a dataset's driving style.
+        phone: the recording phone's model and platform, when known."""
         trip_id = self.trip_id(driver, trip)
         self.trips_dir.mkdir(parents=True, exist_ok=True)
         distance_km = 0.0
@@ -43,6 +44,7 @@ class TripStore:
             "distance_km": round(distance_km, 2),
             "flag": trip.flag,
             "labels": labels,
+            "phone": phone,
         }
         (self.trips_dir / f"{trip_id}.json").write_text(json.dumps(details, indent=2))
         return trip_id

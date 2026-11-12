@@ -42,6 +42,7 @@ def load_trip(folder: Path) -> tuple[str, Trip, dict]:
     gps = np.loadtxt(folder / "RAW_GPS.txt", usecols=(0, 1, 2, 3))
 
     acc = pd.DataFrame(acc[:, 1:] * G, columns=["x", "y", "z"], index=start + pd.to_timedelta(acc[:, 0], unit="s"))
+    motion_times = acc.index
     acc = acc.resample(STEP).mean()
     gps = pd.DataFrame(gps[:, 1:], columns=["speed_kmh", "lat", "lon"], index=start + pd.to_timedelta(gps[:, 0], unit="s"))
 
@@ -57,7 +58,7 @@ def load_trip(folder: Path) -> tuple[str, Trip, dict]:
     }, index=index)
     points = points.join(_roads(folder, start, index))
 
-    flag = flag_reason(index[0], index[-1], gps.index)
+    flag = flag_reason(index[0], index[-1], gps.index, motion_times)
     trip = Trip(index[0], index[-1], flag, None) if flag else finish_trip(index[0], index[-1], points)
     return driver, trip, labels
 
