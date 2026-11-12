@@ -132,6 +132,15 @@ def test_gps_gap_over_30_seconds_is_flagged(tmp_path, store):
     assert store.list()["flag"].tolist() == ["GPS gap over 30 seconds"]
 
 
+def test_motion_gap_is_flagged_not_filled_in(tmp_path, store):
+    """Our first real recording: iOS paused the app, so motion readings stopped while the drive went on."""
+    truth = synthetic.simulate(synthetic.city_drive(5))
+    paused = lambda r: r["sensor"] in ("Accelerometer", "Gravity") and 120 <= float(r["seconds_elapsed"]) < 125
+    records = [r for r in synthetic.to_records(truth) if not paused(r)]
+    upload(synthetic.write(records, tmp_path / "paused.zip"), "ana", store)
+    assert store.list()["flag"].tolist() == ["motion readings missing for over 2 seconds (app paused?)"]
+
+
 # FD-14: Hide trip start and end points
 
 def test_first_and_last_500m_are_removed(tmp_path, store):

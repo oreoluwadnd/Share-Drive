@@ -66,6 +66,7 @@ unzip -q UAH-DRIVESET-v1.zip '*.txt' -d uah-text
 - Every trip is scored by a model trained **without that driver's trips**, so it can't memorise their own harsh moments.
 - Trips are saved under `data/`. Raw sensor data is never saved, and the first and last 500 m of each trip are removed.
 - Recordings where the phone moved (sideways pushes above 0.3 g for more than 5% of the trip) are flagged and not scored.
+- Trips with a GPS gap over 30 seconds, or motion readings missing for over 2 seconds (the phone paused the app), are flagged and not scored.
 
 ## API
 

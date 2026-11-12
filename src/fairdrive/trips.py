@@ -13,6 +13,9 @@ STOP_SPEED_MS = 1.0
 LONG_STOP = pd.Timedelta(minutes=5)
 MIN_DURATION = pd.Timedelta(minutes=2)
 MAX_GPS_GAP = pd.Timedelta(seconds=30)
+# Longer than any gap in a working recording (phones: 0.05 s; UAH-DriveSet, 10 Hz: 0.96 s), and long
+# enough to hide a hard brake. When iOS pauses the app, motion stops for minutes while the drive goes on.
+MAX_MOTION_GAP = pd.Timedelta(seconds=2)
 # Distance cut from each end of a trip so home and work locations stay private.
 HIDDEN_END_M = 500.0
 # A car can't push sideways this hard for long. In UAH-DriveSet two recordings spent 21% and 45%
@@ -37,7 +40,8 @@ def process_recording(recording: dict[str, pd.DataFrame]) -> list[Trip]:
     gps = recording["Location"]
     gps = gps[(gps["latitude"] != 0) | (gps["longitude"] != 0)]  # 0,0 means no fix yet
     timeline = build_timeline(recording["Accelerometer"], recording["Gravity"], gps)
-    return [_make_trip(segment, gps.index) for segment in split_trips(timeline)]
+    motion_times = recording["Accelerometer"].index
+    return [_make_trip(segment, gps.index, motion_times) for segment in split_trips(timeline)]
 
 
 def build_timeline(acc: pd.DataFrame, gravity: pd.DataFrame, gps: pd.DataFrame) -> pd.DataFrame:
@@ -72,9 +76,9 @@ def split_trips(timeline: pd.DataFrame) -> list[pd.DataFrame]:
     return [segment for _, segment in kept.groupby(segment_id[~long_stop])]
 
 
-def _make_trip(segment: pd.DataFrame, fix_times: pd.DatetimeIndex) -> Trip:
+def _make_trip(segment: pd.DataFrame, fix_times: pd.DatetimeIndex, motion_times: pd.DatetimeIndex) -> Trip:
     start, end = segment.index[0], segment.index[-1]
-    flag = flag_reason(start, end, fix_times)
+    flag = flag_reason(start, end, fix_times, motion_times)
     if flag:
         return Trip(start, end, flag, None)
     points = pd.concat([segment[["lat", "lon", "speed"]], to_car_frame(segment)], axis=1)
@@ -92,15 +96,21 @@ def finish_trip(start: pd.Timestamp, end: pd.Timestamp, points: pd.DataFrame) ->
     return Trip(start, end, None, points[keep])
 
 
-def flag_reason(start: pd.Timestamp, end: pd.Timestamp, fix_times: pd.DatetimeIndex) -> str | None:
+def flag_reason(start: pd.Timestamp, end: pd.Timestamp, fix_times: pd.DatetimeIndex, motion_times: pd.DatetimeIndex) -> str | None:
     """Why a trip can't be scored, or None if it can."""
     if end - start < MIN_DURATION:
         return f"shorter than {MIN_DURATION.total_seconds() / 60:g} minutes"
-    fixes = fix_times[(fix_times >= start) & (fix_times <= end)]
-    edges = pd.DatetimeIndex([start, *fixes, end])
-    if (edges[1:] - edges[:-1]).max() > MAX_GPS_GAP:
+    if _longest_gap(start, end, fix_times) > MAX_GPS_GAP:
         return f"GPS gap over {MAX_GPS_GAP.total_seconds():g} seconds"
+    if _longest_gap(start, end, motion_times) > MAX_MOTION_GAP:
+        return f"motion readings missing for over {MAX_MOTION_GAP.total_seconds():g} seconds (app paused?)"
     return None
+
+
+def _longest_gap(start: pd.Timestamp, end: pd.Timestamp, times: pd.DatetimeIndex) -> pd.Timedelta:
+    inside = times[(times >= start) & (times <= end)]
+    edges = pd.DatetimeIndex([start, *inside, end])
+    return (edges[1:] - edges[:-1]).max()
 
 
 def interp_onto(index: pd.DatetimeIndex, values: pd.Series) -> np.ndarray:

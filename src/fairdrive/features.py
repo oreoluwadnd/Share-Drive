@@ -12,7 +12,7 @@ MAIN_ROAD = {"primary", "primary_link", "secondary", "secondary_link"}
 # Conditions only: nothing here depends on how the person drove.
 # Hour and weekday are left out on purpose. In UAH-DriveSet each driver recorded on their own days and
 # hours, so those columns let the model recognise the driver instead of the conditions: on held-out
-# drivers it was 1.1% better than a simple average with them and 21.6% better without them.
+# drivers it was 1.1% better than a simple average with them and 21.6% better without them (Sprint 2).
 FEATURES = ["highway_share", "main_road_share", "speed_limit_kmh", "is_dark", "temp_c", "precip_mm", "visibility_km"]
 
 
