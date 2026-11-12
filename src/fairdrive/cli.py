@@ -10,6 +10,7 @@ import pandas as pd
 from fairdrive.baseline import driver_scores
 from fairdrive.braking import study
 from fairdrive.compare import comparison
+from fairdrive.leakage import TARGET_GAP_REDUCTION_PCT, leakage
 from fairdrive.model import model_dir, train
 from fairdrive.scoring import score_trips
 from fairdrive.sensorlogger import MissingColumnError
@@ -43,6 +44,7 @@ def main(argv: list[str] | None = None) -> None:
     compare_cmd = commands.add_parser("compare", help="FairDrive vs baseline by driver group")
     compare_cmd.add_argument("--csv", type=Path, help="also save the table as CSV")
     commands.add_parser("stability", help="how much each driver's score varies across conditions")
+    commands.add_parser("leakage", help="does the driving score give away the road type or darkness?")
     commands.add_parser("dashboard", help="open the dashboard in the browser")
 
     args = parser.parse_args(argv)
@@ -95,6 +97,10 @@ def main(argv: list[str] | None = None) -> None:
         print(result["per_group"].to_string(index=False))
         print(f"Average variance within a driver: FairDrive {result['fairdrive_variance']}, baseline {result['baseline_variance']}.")
         print(f"FairDrive varies {result['reduction_pct']}% less (target: at least 30%).")
+    elif args.command == "leakage":
+        print(leakage(score_trips(store)).to_string(index=False))
+        print(f"Target: FairDrive's gap between groups at least {TARGET_GAP_REDUCTION_PCT:g}% smaller than the baseline's. "
+              "Guess accuracy: 0.5 = chance. Rows without numbers have under 10 trips on one side.")
     elif args.command == "dashboard":
         env = {**os.environ, "FAIRDRIVE_DATA": str(args.data_dir.resolve())}
         subprocess.run([sys.executable, "-m", "streamlit", "run", str(APP)], env=env, check=True)

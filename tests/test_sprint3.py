@@ -1,10 +1,11 @@
-"""Sprint 3: braking study (FD-22)."""
+"""Sprint 3: braking study (FD-22) and context leakage (FD-24)."""
 
 import numpy as np
 import pandas as pd
 import pytest
 
 from fairdrive.braking import brake_rows, macro_f1
+from fairdrive.leakage import leakage
 
 
 def one_brake_trip():
@@ -51,3 +52,29 @@ def test_macro_f1():
     assert macro_f1(y, np.array([1, 1, 0, 0])) == 0.0
     # Always guessing one label: F1 of 2/3 for that label, 0 for the other.
     assert macro_f1(y, np.zeros(4, dtype=int)) == pytest.approx(1 / 3)
+
+
+# FD-24: Detect context leakage. The shared test trips put the same driving on city and highway roads,
+# by day (even drivers) and by night (odd drivers), so any score gap between those groups is leakage.
+
+def test_fairdrive_gap_between_road_types_is_at_least_half_the_baselines(scores):
+    result = leakage(scores).set_index("context")
+    urban = result.loc["Urban vs mostly highway"]
+    assert urban["meets_target"], urban
+    # The baseline gives the road type away: city trips always score lower.
+    assert urban["baseline_guess_accuracy"] > 0.8, urban
+    # FairDrive gives less away. Not nothing: with no noise in these trips, the smoothing's 3-point
+    # difference for drivers with no harsh moments (96 on highways, 99 in the city) still sorts them.
+    assert urban["fairdrive_guess_accuracy"] < urban["baseline_guess_accuracy"], urban
+
+
+def test_night_planted_with_identical_driving_does_not_leak(scores):
+    night = leakage(scores).set_index("context").loc["Night vs daytime"]
+    assert not night["fairdrive_leaks"], night
+    assert night["baseline_gap"] == 0 and pd.isna(night["gap_reduction_pct"])  # nothing planted, nothing to remove
+
+
+def test_too_few_trips_on_one_side_gives_no_verdict(scores):
+    few_night = scores.assign(is_dark=scores.index < 3)
+    night = leakage(few_night).set_index("context").loc["Night vs daytime"]
+    assert night["in_group"] == 3 and pd.isna(night["gap_reduction_pct"])
