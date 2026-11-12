@@ -15,7 +15,7 @@ from fairdrive.events import THRESHOLD_G, G, event_starts
 from fairdrive.features import is_tagged
 from fairdrive.model import model_dir, train
 from fairdrive.scoring import conditions_tier, score_trips, tier
-from fairdrive.sensorlogger import MissingColumnError
+from fairdrive.sensorlogger import RecordingError
 from fairdrive.stability import TARGET_REDUCTION_PCT, stability
 from fairdrive.store import TripStore
 from fairdrive.tagging import tag_all
@@ -50,7 +50,7 @@ with st.sidebar:
     st.header("Add a trip")
     with st.form("upload", clear_on_submit=True):
         driver = st.text_input("Driver name", key="driver_name")
-        recording = st.file_uploader("Sensor Logger recording (JSON)", type=["json"], key="recording")
+        recording = st.file_uploader("Sensor Logger recording (zip export)", type=["zip"], key="recording")
         submitted = st.form_submit_button("Upload")
     if submitted:
         if not driver or recording is None:
@@ -62,7 +62,7 @@ with st.sidebar:
                 try:
                     trip_ids = upload(path, driver.strip(), store)
                     st.success(f"Saved {len(trip_ids)} trip(s). Next: add road, time and weather.")
-                except MissingColumnError as error:
+                except RecordingError as error:
                     st.error(f"{error}. Nothing was saved.")
                 except FileExistsError as error:
                     st.error(str(error))

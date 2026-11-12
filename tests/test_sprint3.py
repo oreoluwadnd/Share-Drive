@@ -1,4 +1,4 @@
-"""Sprint 3: braking study (FD-22) and context leakage (FD-24)."""
+"""Sprint 3: braking study (FD-22), context leakage (FD-24) and fairness by phone (FD-25)."""
 
 import numpy as np
 import pandas as pd
@@ -6,6 +6,7 @@ import pytest
 
 from fairdrive.braking import brake_rows, macro_f1
 from fairdrive.leakage import leakage
+from fairdrive.phones import phone_noise, stopped_noise_g
 
 
 def one_brake_trip():
@@ -78,3 +79,32 @@ def test_too_few_trips_on_one_side_gives_no_verdict(scores):
     few_night = scores.assign(is_dark=scores.index < 3)
     night = leakage(few_night).set_index("context").loc["Night vs daytime"]
     assert night["in_group"] == 3 and pd.isna(night["gap_reduction_pct"])
+
+
+# FD-25: Check fairness by phone type
+
+def test_score_noise_is_reported_per_phone(store, scores):
+    for trip_id in scores["trip_id"]:
+        details = store.details(trip_id)
+        cheap = details["driver"] in ("driver0", "driver1", "driver2")
+        details["phone"] = {"device": "Budget A10", "platform": "android"} if cheap else {"device": "iPhone 13", "platform": "ios"}
+        store.update(trip_id, details, store.points(trip_id))
+    table = phone_noise(scores, store).set_index("phone")
+    assert list(table.index) == ["Budget A10 (android)", "iPhone 13 (ios)"]
+    assert table["trips"].tolist() == [18, 18] and table["drivers"].tolist() == [3, 3]
+    budget = scores[scores["driver"].isin(["driver0", "driver1", "driver2"])]
+    expected = budget.groupby(["driver", "style"])["driving_score"].std().mean()
+    assert table.loc["Budget A10 (android)", "score_spread"] == pytest.approx(expected, abs=1e-3)
+
+
+def test_trips_without_phone_details_are_grouped_by_source(store, scores):
+    assert phone_noise(scores, store)["phone"].tolist() == ["unknown (sensorlogger)"]
+
+
+def test_sensor_noise_is_measured_only_while_stopped():
+    index = pd.date_range("2026-03-01", periods=200, freq="100ms", tz="UTC")
+    rng = np.random.default_rng(0)
+    points = pd.DataFrame({"speed": np.r_[np.zeros(100), np.full(100, 20.0)],
+                           "acc_forward": np.r_[rng.normal(0, 0.02 * 9.80665, 100), np.full(100, 5.0)]}, index=index)
+    assert stopped_noise_g(points) == pytest.approx(0.02, rel=0.2)
+    assert np.isnan(stopped_noise_g(points.assign(speed=20.0)))

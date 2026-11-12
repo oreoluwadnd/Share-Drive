@@ -12,8 +12,9 @@ from fairdrive.braking import study
 from fairdrive.compare import comparison
 from fairdrive.leakage import TARGET_GAP_REDUCTION_PCT, leakage
 from fairdrive.model import model_dir, train
+from fairdrive.phones import phone_noise
 from fairdrive.scoring import score_trips
-from fairdrive.sensorlogger import MissingColumnError
+from fairdrive.sensorlogger import RecordingError
 from fairdrive.stability import stability
 from fairdrive.store import TripStore
 from fairdrive.tagging import tag_all
@@ -28,7 +29,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--data-dir", type=Path, default=Path("data"), help="where trips are stored (default: data)")
     commands = parser.add_subparsers(dest="command", required=True)
 
-    upload_cmd = commands.add_parser("upload", help="upload a Sensor Logger JSON export")
+    upload_cmd = commands.add_parser("upload", help="upload a Sensor Logger zip export")
     upload_cmd.add_argument("file", type=Path)
     upload_cmd.add_argument("--driver", required=True)
     uah_cmd = commands.add_parser("load-uah", help="load the UAH-DriveSet public dataset")
@@ -45,6 +46,7 @@ def main(argv: list[str] | None = None) -> None:
     compare_cmd.add_argument("--csv", type=Path, help="also save the table as CSV")
     commands.add_parser("stability", help="how much each driver's score varies across conditions")
     commands.add_parser("leakage", help="does the driving score give away the road type or darkness?")
+    commands.add_parser("phones", help="sensor noise and score spread per phone model")
     commands.add_parser("dashboard", help="open the dashboard in the browser")
 
     args = parser.parse_args(argv)
@@ -54,7 +56,7 @@ def main(argv: list[str] | None = None) -> None:
     if args.command == "upload":
         try:
             trip_ids = upload(args.file, args.driver, store)
-        except MissingColumnError as error:
+        except RecordingError as error:
             sys.exit(f"error: {error}. Nothing was saved.")
         trips = store.list()
         print(trips[trips["trip_id"].isin(trip_ids)].to_string(index=False))
@@ -101,6 +103,10 @@ def main(argv: list[str] | None = None) -> None:
         print(leakage(score_trips(store)).to_string(index=False))
         print(f"Target: FairDrive's gap between groups at least {TARGET_GAP_REDUCTION_PCT:g}% smaller than the baseline's. "
               "Guess accuracy: 0.5 = chance. Rows without numbers have under 10 trips on one side.")
+    elif args.command == "phones":
+        print(phone_noise(score_trips(store), store).to_string(index=False))
+        print("sensor_noise_g: spread of the reading while stopped. score_spread: how much a driver's score varies "
+              "between their trips on that phone (same driving style).")
     elif args.command == "dashboard":
         env = {**os.environ, "FAIRDRIVE_DATA": str(args.data_dir.resolve())}
         subprocess.run([sys.executable, "-m", "streamlit", "run", str(APP)], env=env, check=True)
