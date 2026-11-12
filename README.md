@@ -46,6 +46,7 @@ uv run fairdrive leakage                              # does the score give away
 uv run fairdrive phones                               # sensor noise and score spread per phone model
 uv run fairdrive braking-study path/to/UAH-DRIVESET-v1 # can the phone tell planned stops from panic stops?
 uv run fairdrive dashboard                            # the web dashboard
+uv run fairdrive api                                  # scores over HTTP on port 8000 (docs at http://localhost:8000/docs)
 ```
 
 `tag` can be re-run any time. It skips trips that are done and fills in weather that Environment Canada hadn't published yet (it runs a few days behind).
@@ -63,6 +64,16 @@ unzip -q UAH-DRIVESET-v1.zip '*.txt' -d uah-text
 - Every trip is scored by a model trained **without that driver's trips**, so it can't memorise their own harsh moments.
 - Trips are saved under `data/`. Raw sensor data is never saved, and the first and last 500 m of each trip are removed.
 - Recordings where the phone moved (sideways pushes above 0.3 g for more than 5% of the trip) are flagged and not scored.
+
+## API
+
+```
+curl -F driver=ana -F file=@recording.zip localhost:8000/trips     # upload, then add road, time and weather
+curl localhost:8000/trips/<trip_id>/score                           # driving, conditions and old score
+curl localhost:8000/trips/<trip_id>/explain                         # three reasons for each score
+```
+
+A file that can't be used gets a 400 that names the problem.
 
 ## Recording a drive
 

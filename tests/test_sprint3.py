@@ -108,3 +108,47 @@ def test_sensor_noise_is_measured_only_while_stopped():
                            "acc_forward": np.r_[rng.normal(0, 0.02 * 9.80665, 100), np.full(100, 5.0)]}, index=index)
     assert stopped_noise_g(points) == pytest.approx(0.02, rel=0.2)
     assert np.isnan(stopped_noise_g(points.assign(speed=20.0)))
+
+
+# FD-26: Serve scores through an API
+
+@pytest.fixture
+def client(store, monkeypatch):
+    from fastapi.testclient import TestClient
+    from fairdrive import api
+    monkeypatch.setattr(api, "store", store)
+    monkeypatch.setattr(api, "tag_all", lambda store: [])  # tagging needs the internet; the shared trips are already tagged
+    api._cache.clear()
+    return TestClient(api.app)
+
+
+def test_score_and_explain_a_trip(client, store):
+    trip_id = store.list()["trip_id"].iloc[0]
+    score = client.get(f"/trips/{trip_id}/score")
+    assert score.status_code == 200
+    body = score.json()
+    assert 0 <= body["driving_score"] <= 100 and 0 <= body["conditions_score"] <= 100 and "old_score" in body
+    explain = client.get(f"/trips/{trip_id}/explain").json()
+    assert len(explain["driving_reasons"]) == 3 and len(explain["conditions_reasons"]) == 3
+
+
+def test_upload_a_valid_trip(client, store, tmp_path):
+    from tests import synthetic
+    path = synthetic.write(synthetic.to_records(synthetic.simulate(synthetic.city_drive(5))), tmp_path / "trip.zip")
+    response = client.post("/trips", files={"file": ("trip.zip", path.read_bytes())}, data={"driver": "ana"})
+    assert response.status_code == 201
+    [trip] = response.json()["trips"]
+    assert trip["trip_id"].startswith("ana-") and trip["flag"] is None
+    # Not tagged (tagging is switched off here), so it can't be scored yet, and the API says why.
+    not_yet = client.get(f"/trips/{trip['trip_id']}/score")
+    assert not_yet.status_code == 422 and "road, time and weather" in not_yet.json()["detail"]
+
+
+def test_invalid_file_is_a_400_naming_the_problem(client, store):
+    response = client.post("/trips", files={"file": ("trip.json", b"[]")}, data={"driver": "ana"})
+    assert response.status_code == 400
+    assert "not a Sensor Logger zip export" in response.json()["detail"]
+
+
+def test_unknown_trip_is_a_404(client):
+    assert client.get("/trips/nobody-20260101T000000Z/score").status_code == 404

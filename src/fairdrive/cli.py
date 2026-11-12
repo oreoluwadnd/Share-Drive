@@ -22,6 +22,7 @@ from fairdrive.uah import load_dataset
 from fairdrive.upload import upload
 
 APP = Path(__file__).with_name("app.py")
+API_PORT = 8000
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -48,6 +49,7 @@ def main(argv: list[str] | None = None) -> None:
     commands.add_parser("leakage", help="does the driving score give away the road type or darkness?")
     commands.add_parser("phones", help="sensor noise and score spread per phone model")
     commands.add_parser("dashboard", help="open the dashboard in the browser")
+    commands.add_parser("api", help=f"serve scores over HTTP on port {API_PORT} (docs at /docs)")
 
     args = parser.parse_args(argv)
     store = TripStore(args.data_dir)
@@ -110,3 +112,6 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "dashboard":
         env = {**os.environ, "FAIRDRIVE_DATA": str(args.data_dir.resolve())}
         subprocess.run([sys.executable, "-m", "streamlit", "run", str(APP)], env=env, check=True)
+    elif args.command == "api":
+        env = {**os.environ, "FAIRDRIVE_DATA": str(args.data_dir.resolve())}
+        subprocess.run([sys.executable, "-m", "uvicorn", "fairdrive.api:app", "--port", str(API_PORT)], env=env, check=True)
