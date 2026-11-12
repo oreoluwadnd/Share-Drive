@@ -9,6 +9,8 @@ Each trip gets two scores from 0 to 100:
 
 The **old score** uses the same scale but compares you with the average trip, ignoring conditions.
 
+Reports: [final report](docs/final-report.md), [model cards](docs/model-cards.md), [fairness audit](docs/fairness-audit.md).
+
 ## Setup
 
 On a Mac, LightGBM needs OpenMP once: `brew install libomp`.

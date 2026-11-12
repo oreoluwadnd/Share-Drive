@@ -99,6 +99,9 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "stability":
         result = stability(score_trips(store))
         print(result["per_group"].to_string(index=False))
+        by_style = result["per_group"].groupby("style")[["fairdrive_variance", "baseline_variance"]].mean()
+        by_style["less_pct"] = 100 * (1 - by_style["fairdrive_variance"] / by_style["baseline_variance"])
+        print(by_style.round(1).to_string())
         print(f"Average variance within a driver: FairDrive {result['fairdrive_variance']}, baseline {result['baseline_variance']}.")
         print(f"FairDrive varies {result['reduction_pct']}% less (target: at least 30%).")
     elif args.command == "leakage":
