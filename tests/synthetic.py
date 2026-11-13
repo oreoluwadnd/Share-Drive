@@ -1,10 +1,10 @@
-"""Simulated Sensor Logger zip exports with a known ground truth.
+"""Simulated Sensor Logger JSON exports with a known ground truth.
 
 A drive is a list of phases: (seconds, forward acceleration m/s², turn rate deg/s,
 positive = clockwise/right). The phone sits in a random fixed mount position.
 """
 
-import zipfile
+import json
 from pathlib import Path
 
 import numpy as np
@@ -79,13 +79,7 @@ def to_records(truth: pd.DataFrame, platform: str = "android", seed: int = 0, gp
 
 
 def write(records: list[dict], path: Path) -> Path:
-    """A zip with one CSV per sensor, as Sensor Logger exports it."""
-    by_sensor: dict[str, list[dict]] = {}
-    for record in records:
-        by_sensor.setdefault(record["sensor"], []).append({k: v for k, v in record.items() if k != "sensor"})
-    with zipfile.ZipFile(path, "w") as archive:
-        for sensor, rows in by_sensor.items():
-            archive.writestr(f"{sensor}.csv", pd.DataFrame(rows).to_csv(index=False))
+    path.write_text(json.dumps(records))
     return path
 
 

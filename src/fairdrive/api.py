@@ -1,6 +1,6 @@
 """Scores through an API (FD-26). Start it with `uv run fairdrive api`.
 
-POST /trips                    upload a Sensor Logger zip (form fields: file, driver); adds road, time and weather
+POST /trips                    upload a Sensor Logger JSON export (form fields: file, driver); adds road, time and weather
 GET  /trips/{trip_id}/score    both scores and the old score
 GET  /trips/{trip_id}/explain  three plain-language reasons for each score
 """
@@ -13,6 +13,7 @@ from pathlib import Path
 import pandas as pd
 from fastapi import FastAPI, Form, HTTPException, UploadFile
 
+from fairdrive.features import is_tagged
 from fairdrive.model import model_dir
 from fairdrive.scoring import score_trips
 from fairdrive.sensorlogger import RecordingError
@@ -28,7 +29,7 @@ _cache: dict[tuple, pd.DataFrame] = {}
 @app.post("/trips", status_code=201)
 def add_trip(file: UploadFile, driver: str = Form()) -> dict:
     with tempfile.TemporaryDirectory() as folder:
-        path = Path(folder) / Path(file.filename or "recording.zip").name
+        path = Path(folder) / Path(file.filename or "recording.json").name
         path.write_bytes(file.file.read())
         try:
             trip_ids = upload(path, driver.strip(), store)
@@ -63,8 +64,14 @@ def _scored(trip_id: str) -> pd.Series:
         raise HTTPException(404, f"No trip {trip_id}")
     scores = _scores().set_index("trip_id")
     if trip_id not in scores.index:
-        flag = store.details(trip_id)["flag"]
-        raise HTTPException(422, f"Trip {trip_id} is not scored: {flag or 'it still needs road, time and weather (run `fairdrive tag`)'}")
+        details = store.details(trip_id)
+        if details["flag"]:
+            why = details["flag"]
+        elif not is_tagged(details):
+            why = "it still needs road, time and weather (run `fairdrive tag`)"
+        else:
+            why = "less than 1 km is left once 500 m is hidden at each end. Drive at least 3 km"
+        raise HTTPException(422, f"Trip {trip_id} is not scored: {why}")
     return scores.loc[trip_id]
 
 

@@ -50,7 +50,7 @@ with st.sidebar:
     st.header("Add a trip")
     with st.form("upload", clear_on_submit=True):
         driver = st.text_input("Driver name", key="driver_name")
-        recording = st.file_uploader("Sensor Logger recording (zip export)", type=["zip"], key="recording")
+        recording = st.file_uploader("Sensor Logger recording (JSON)", type=["json"], key="recording")
         submitted = st.form_submit_button("Upload")
     if submitted:
         if not driver or recording is None:

@@ -33,7 +33,7 @@ def recording(tmp_path, driver: int, trip: int):
     for r in records:
         if "time" in r:
             r["time"] = str(int(r["time"]) + offset)
-    return synthetic.write(records, tmp_path / f"{DRIVERS[driver]}-{trip}.zip")
+    return synthetic.write(records, tmp_path / f"{DRIVERS[driver]}-{trip}.json")
 
 
 @pytest.fixture

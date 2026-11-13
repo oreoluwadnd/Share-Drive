@@ -29,12 +29,12 @@ uv run fairdrive tag                               # adds time of day; UAH roads
 uv run fairdrive dashboard                         # opens http://localhost:8501
 ```
 
-In the dashboard: upload a Sensor Logger zip export in the sidebar, press **Add road, time and weather**, and the trip appears in **My trips** with both scores. **Trip details** shows the reasons, the route, speed against the limit and hard brakes. **FairDrive vs old score** compares groups and downloads a CSV. **Score stability** shows how much each driver's score varies between trips.
+In the dashboard: upload a Sensor Logger JSON export in the sidebar, press **Add road, time and weather**, and the trip appears in **My trips** with both scores. **Trip details** shows the reasons, the route, speed against the limit and hard brakes. **FairDrive vs old score** compares groups and downloads a CSV. **Score stability** shows how much each driver's score varies between trips.
 
 ## Commands
 
 ```
-uv run fairdrive upload recording.zip --driver ana    # check, clean, split and save trips
+uv run fairdrive upload recording.json --driver ana   # check, clean, split and save trips
 uv run fairdrive load-uah path/to/UAH-DRIVESET-v1     # load the UAH-DriveSet public dataset
 uv run fairdrive tag                                  # road type, speed limit, time of day, weather (needs internet for phone trips)
 uv run fairdrive trips                                # list trips (flagged ones are not scored)
@@ -71,7 +71,7 @@ unzip -q UAH-DRIVESET-v1.zip '*.txt' -d uah-text
 ## API
 
 ```
-curl -F driver=ana -F file=@recording.zip localhost:8000/trips     # upload, then add road, time and weather
+curl -F driver=ana -F file=@recording.json localhost:8000/trips    # upload, then add road, time and weather
 curl localhost:8000/trips/<trip_id>/score                           # driving, conditions and old score
 curl localhost:8000/trips/<trip_id>/explain                         # three reasons for each score
 ```
@@ -80,6 +80,6 @@ A file that can't be used gets a 400 that names the problem.
 
 ## Recording a drive
 
-In Sensor Logger, switch on **Accelerometer**, **Gravity** and **Location**, and give it location access **Always** (iPhone: Settings → Sensor Logger → Location → Always, Precise on). Without location an iPhone pauses the app when the screen locks. Export the recording as a **zip** (the default); it holds one CSV per sensor and `Metadata.csv` with the phone model.
+In Sensor Logger, switch on **Accelerometer**, **Gravity** and **Location**, and give it location access **Always** (iPhone: Settings → Sensor Logger → Location → Always, Precise on). Without location an iPhone pauses the app when the screen locks. Export the recording as **JSON**. Or record with the FairDrive phone app in `mobile/`, which sends the trip straight to the API and shows the scores (see `mobile/README.md`).
 
 Keep the phone in one mount position for the whole drive. Acceleration is turned into the car's forward, sideways and vertical directions using GPS, which only works if the phone stays still in its mount.
