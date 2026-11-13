@@ -1,15 +1,18 @@
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { File } from 'expo-file-system';
 import { useKeepAwake } from 'expo-keep-awake';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Sharing from 'expo-sharing';
 import { StatusBar } from 'expo-status-bar';
-import { ReactNode, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
+import { ComponentProps, useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Moment, sendTrip, serverUrl, TripResult } from './src/fairdrive';
 import { Live, Recorder } from './src/recorder';
+import { DrivingRoad, ScoreRing, SlideIn } from './src/motion';
 import { T } from './src/theme';
+
+type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
 type Screen =
   | { name: 'ready' }
@@ -53,7 +56,7 @@ export default function App() {
 
   return (
     <LinearGradient colors={T.background} style={s.root}>
-      <StatusBar style={T.statusBar} />
+      <StatusBar style="dark" />
       <Text style={s.brand}>FairDrive</Text>
       {screen.name === 'ready' && (
         <Ready driver={driver} server={server} onDriver={setDriver} onServer={setServer} onStart={start} />
@@ -81,6 +84,7 @@ function Ready(p: { driver: string; server: string; onDriver: (t: string) => voi
     <ScrollView contentContainerStyle={s.page} keyboardShouldPersistTaps="handled">
       <Text style={s.title}>Ready to drive</Text>
       <Text style={s.lead}>Your score compares you with what's normal for your roads, light and weather.</Text>
+      <DrivingRoad kmh={20} />
 
       <View style={s.card}>
         <Field label="Driver name" value={p.driver} onChange={p.onDriver} placeholder="e.g. Ana" />
@@ -120,6 +124,7 @@ function Recording({ live, onStop }: { live: Live; onStop: () => void }) {
         <Text style={s.timerPillText}>{minutes}:{seconds}</Text>
       </View>
       <View style={s.center}>
+        <View style={s.roadWide}><DrivingRoad kmh={live.kmh} /></View>
         <Text style={s.bigNumber}>{live.km.toFixed(1)}</Text>
         <Text style={s.bigUnit}>km driven</Text>
         <View style={s.statRow}>
@@ -146,7 +151,7 @@ function Recording({ live, onStop }: { live: Live; onStop: () => void }) {
 function Sending() {
   return (
     <View style={[s.page, s.center]}>
-      <ActivityIndicator size="large" color={T.text} />
+      <View style={s.roadWide}><DrivingRoad kmh={60} /></View>
       <Text style={[s.title, s.centerText]}>Scoring your drive</Text>
       <Text style={[s.lead, s.centerText]}>Looking up the roads, daylight and weather on your route. This can take a minute.</Text>
     </View>
@@ -170,55 +175,48 @@ function Results({ trips, onSave, onNew }: { trips: TripResult[]; onSave: () => 
 
 function ScoredTrip({ trip }: { trip: Extract<TripResult, { kind: 'scored' }> }) {
   const tier = drivingTier(trip.score.driving_score);
+  const headline = headlineFor(trip.score.moments);
   return (
     <View style={s.section}>
-      <View style={[s.card, s.hero]}>
-        <Ring value={trip.score.driving_score} colors={T.ring[tier.level]}>
-          <Text style={s.heroNumber}>{trip.score.driving_score.toFixed(0)}</Text>
-          <Text style={[s.heroTier, { color: T.ring[tier.level][0] }]}>{tier.word}</Text>
-        </Ring>
-        <Text style={s.cardTitle}>Driving score</Text>
-        <Text style={[s.muted, s.centerText]}>Compared with what's normal on your roads, in this light and weather, over {trip.score.km} km.</Text>
-      </View>
+      <SlideIn delay={0}>
+        <View style={[s.card, s.hero]}>
+          <LinearGradient colors={[`${T.ring[tier.level][0]}22`, '#FFFFFF00']} style={StyleSheet.absoluteFill} />
+          <ScoreRing value={trip.score.driving_score} colors={T.ring[tier.level]} word={tier.word} />
+          <Text style={s.headline}>{headline.title}</Text>
+          <Text style={[s.muted, s.centerText]}>{headline.detail}</Text>
+          <View style={s.chipRow}>
+            <Chip icon="map-marker-distance" text={`${trip.score.km} km`} />
+            <Chip icon="road-variant" text={conditionsWord(trip.score.conditions_score)} />
+          </View>
+        </View>
+      </SlideIn>
 
-      <View style={s.tileRow}>
-        <Tile label="Conditions" value={trip.score.conditions_score} note={conditionsWord(trip.score.conditions_score)} />
-        <Tile label="Old score" value={trip.score.old_score} note="Ignores conditions" />
-      </View>
+      <SlideIn delay={150}>
+        <View style={s.tileRow}>
+          <Tile icon="weather-partly-cloudy" label="Conditions" value={trip.score.conditions_score} note="100 = easiest" />
+          <Tile icon="history" label="Old score" value={trip.score.old_score} note="Ignores conditions" />
+        </View>
+      </SlideIn>
 
-      <Text style={s.sectionTitle}>What shaped your score</Text>
-      <View style={s.card}>
-        {trip.score.moments.map((moment, i) => <MomentRow key={moment.kind} moment={moment} first={i === 0} />)}
-        <Text style={s.legend}>The line marks what's normal for these roads, light and weather.</Text>
-      </View>
-      <Reasons title="In plain words" items={trip.reasons.driving_reasons} />
-      <Reasons title="About the conditions" items={trip.reasons.conditions_reasons} />
+      <SlideIn delay={300}>
+        <Text style={s.sectionTitle}>What shaped your score</Text>
+        <View style={[s.card, s.gapTop]}>
+          {trip.score.moments.map((moment, i) => <MomentRow key={moment.kind} moment={moment} first={i === 0} />)}
+          <Text style={s.legend}>The black line marks what's normal for these roads, light and weather.</Text>
+        </View>
+      </SlideIn>
+
+      <SlideIn delay={450}>
+        <Reasons title="In plain words" items={trip.reasons.driving_reasons.map((text) => ({ text, icon: isGood(text) ? 'check-circle' : 'alert-circle', color: isGood(text) ? T.ring.good[0] : T.ring.fair[0] }))} />
+      </SlideIn>
+      <SlideIn delay={600}>
+        <Reasons title="About the conditions" items={trip.reasons.conditions_reasons.map((text, i) => ({ text, icon: conditionIcon(text, i), color: T.muted }))} />
+      </SlideIn>
     </View>
   );
 }
 
-function Ring({ value, colors, children }: { value: number; colors: readonly [string, string]; children: ReactNode }) {
-  const size = 220, stroke = 18;
-  const r = (size - stroke) / 2, around = 2 * Math.PI * r;
-  return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
-        <Defs>
-          <SvgGradient id="ring" x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0" stopColor={colors[0]} />
-            <Stop offset="1" stopColor={colors[1]} />
-          </SvgGradient>
-        </Defs>
-        <Circle cx={size / 2} cy={size / 2} r={r} stroke={T.track} strokeWidth={stroke} fill="none" />
-        <Circle
-          cx={size / 2} cy={size / 2} r={r} stroke="url(#ring)" strokeWidth={stroke} fill="none" strokeLinecap="round"
-          strokeDasharray={`${(around * value) / 100} ${around}`} transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        />
-      </Svg>
-      {children}
-    </View>
-  );
-}
+const MOMENT_ICONS: Record<string, IconName> = { hard_brake: 'car-brake-alert', hard_accel: 'speedometer', hard_corner: 'steering' };
 
 function MomentRow({ moment, first }: { moment: Moment; first: boolean }) {
   const over = moment.count > moment.normal + 0.5;
@@ -227,6 +225,9 @@ function MomentRow({ moment, first }: { moment: Moment; first: boolean }) {
   return (
     <View style={[s.momentRow, !first && s.momentDivider]}>
       <View style={s.momentHead}>
+        <View style={[s.iconBubble, { backgroundColor: `${colors[0]}1F` }]}>
+          <MaterialCommunityIcons name={MOMENT_ICONS[moment.kind]} size={20} color={colors[0]} />
+        </View>
         <Text style={s.momentLabel}>{moment.label}</Text>
         <Text style={s.momentValue}>
           <Text style={{ color: colors[0], fontWeight: '800' }}>{moment.count}</Text>
@@ -240,6 +241,35 @@ function MomentRow({ moment, first }: { moment: Moment; first: boolean }) {
     </View>
   );
 }
+
+const MOMENT_ADVICE: Record<string, { title: string; noun: string }> = {
+  hard_brake: { title: 'Watch your braking', noun: 'hard brakes' },
+  hard_accel: { title: 'Ease off when speeding up', noun: 'sharp starts' },
+  hard_corner: { title: 'Take turns more gently', noun: 'sharp turns' },
+};
+
+/** One line on top of the score: the kind of harsh moment furthest above normal, or praise if none is. */
+function headlineFor(moments: Moment[]): { title: string; detail: string } {
+  const worst = moments.filter((m) => m.count > m.normal + 0.5).sort((a, b) => (b.count - b.normal) - (a.count - a.normal))[0];
+  if (!worst) return { title: 'Smooth, steady drive', detail: 'Every kind of harsh moment was at or below normal for these conditions.' };
+  const advice = MOMENT_ADVICE[worst.kind];
+  return { title: advice.title, detail: `${worst.count} ${advice.noun} where about ${Math.round(worst.normal)} is normal here.` };
+}
+
+const isGood = (reason: string) => /normal or better|needs no change|never/.test(reason);
+
+function conditionIcon(reason: string, index: number): IconName {
+  if (index === 0) return 'gauge';
+  if (index === 1) return 'road-variant';
+  return reason.includes('in the dark') ? 'weather-night' : 'white-balance-sunny';
+}
+
+const Chip = ({ icon, text }: { icon: IconName; text: string }) => (
+  <View style={s.chip}>
+    <MaterialCommunityIcons name={icon} size={16} color={T.muted} />
+    <Text style={s.chipText}>{text}</Text>
+  </View>
+);
 
 function Problem(p: { message: string; onRetry?: () => void; onSave?: () => void; onNew: () => void }) {
   return (
@@ -294,19 +324,27 @@ const Tip = ({ text }: { text: string }) => (
   </View>
 );
 
-const Tile = ({ label, value, note }: { label: string; value: number; note: string }) => (
+const Tile = ({ icon, label, value, note }: { icon: IconName; label: string; value: number; note: string }) => (
   <View style={[s.card, s.tile]}>
-    <Text style={s.label}>{label}</Text>
+    <View style={s.tileHead}>
+      <MaterialCommunityIcons name={icon} size={18} color={T.muted} />
+      <Text style={s.label}>{label}</Text>
+    </View>
     <Text style={s.tileNumber}>{value.toFixed(0)}</Text>
     <Text style={s.muted}>{note}</Text>
   </View>
 );
 
-const Reasons = ({ title, items }: { title: string; items: string[] }) => (
+const Reasons = ({ title, items }: { title: string; items: { text: string; icon: IconName; color: string }[] }) => (
   <View style={s.section}>
     <Text style={s.sectionTitle}>{title}</Text>
     <View style={[s.card, s.tips]}>
-      {items.map((item) => <Tip key={item} text={item} />)}
+      {items.map((item) => (
+        <View key={item.text} style={s.tip}>
+          <MaterialCommunityIcons name={item.icon} size={20} color={item.color} style={s.reasonIcon} />
+          <Text style={s.tipText}>{item.text}</Text>
+        </View>
+      ))}
     </View>
   </View>
 );
@@ -337,7 +375,7 @@ const s = StyleSheet.create({
   body: { color: T.text, fontSize: 16, lineHeight: 23 },
   muted: { color: T.muted, fontSize: 14, lineHeight: 20 },
   label: { color: T.muted, fontSize: 13, fontWeight: '600' },
-  card: { backgroundColor: T.card, borderRadius: 28, padding: 20, gap: 8, borderColor: T.cardBorder, borderWidth: 1, ...T.cardShadow },
+  card: { backgroundColor: T.card, borderRadius: 28, padding: 20, gap: 8, ...T.cardShadow },
   cardDivider: { height: 1, backgroundColor: T.track, marginVertical: 8 },
   cardTitle: { color: T.text, fontSize: 18, fontWeight: '700' },
   field: { gap: 6 },
@@ -364,16 +402,23 @@ const s = StyleSheet.create({
   stopSquare: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#FFFFFF' },
   section: { gap: 12 },
   sectionTitle: { color: T.text, fontSize: 21, fontWeight: '800', letterSpacing: -0.3, marginTop: 8 },
-  hero: { alignItems: 'center', paddingVertical: 28, gap: 12 },
-  heroNumber: { color: T.text, fontSize: 72, fontWeight: '800', fontVariant: ['tabular-nums'], letterSpacing: -3 },
-  heroTier: { fontSize: 15, fontWeight: '800', marginTop: -4 },
+  hero: { alignItems: 'center', paddingVertical: 28, gap: 10, overflow: 'hidden' },
+  headline: { color: T.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.4, marginTop: 6 },
+  chipRow: { flexDirection: 'row', gap: 8, marginTop: 6, flexWrap: 'wrap', justifyContent: 'center' },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: T.track, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  chipText: { color: T.text, fontSize: 13, fontWeight: '600' },
+  gapTop: { marginTop: 12 },
+  roadWide: { alignSelf: 'stretch', marginBottom: 24 },
+  tileHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  iconBubble: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  reasonIcon: { marginTop: 1 },
   tileRow: { flexDirection: 'row', gap: 12 },
   tile: { flex: 1, gap: 2 },
   tileNumber: { color: T.text, fontSize: 40, fontWeight: '800', fontVariant: ['tabular-nums'], letterSpacing: -1 },
   momentRow: { gap: 10, paddingVertical: 10 },
   momentDivider: { borderTopColor: T.track, borderTopWidth: 1 },
-  momentHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  momentLabel: { color: T.text, fontSize: 16, fontWeight: '700' },
+  momentHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  momentLabel: { color: T.text, fontSize: 16, fontWeight: '700', flex: 1 },
   momentValue: { fontSize: 16, fontVariant: ['tabular-nums'] },
   track: { height: 10, borderRadius: 5, backgroundColor: T.track },
   fill: { height: 10, borderRadius: 5 },
