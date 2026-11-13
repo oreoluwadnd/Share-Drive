@@ -45,7 +45,7 @@ Data: UAH-DriveSet (6 drivers, 37 scored trips, 682 km, Spain). Commands reprodu
 | FD-30: full flow, 10 trips | all scored with reasons, no errors | 10 test recordings and all 37 scorable UAH trips pass; no open bugs | yes |
 | FD-32 to 34: driver attention from video | | cut (needs video of the driver; UAH films the road) | cut |
 
-**Tests:** 62 automated tests (`uv run pytest`), including the 10-trip end-to-end test.
+**Tests:** 63 automated tests (`uv run pytest`), including the 10-trip end-to-end test.
 
 ## What we learned
 
