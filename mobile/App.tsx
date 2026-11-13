@@ -1,17 +1,15 @@
 import { File } from 'expo-file-system';
 import { useKeepAwake } from 'expo-keep-awake';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Sharing from 'expo-sharing';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 
 import { Moment, sendTrip, serverUrl, TripResult } from './src/fairdrive';
 import { Live, Recorder } from './src/recorder';
-
-const C = {
-  bg: '#0B0E0D', card: '#151A18', line: '#242B28', text: '#F1F4F2', muted: '#8C9691',
-  green: '#3DD68C', amber: '#F5B544', red: '#F0524D', onGreen: '#062114',
-};
+import { T } from './src/theme';
 
 type Screen =
   | { name: 'ready' }
@@ -54,8 +52,8 @@ export default function App() {
   }
 
   return (
-    <View style={s.root}>
-      <StatusBar style="light" />
+    <LinearGradient colors={T.background} style={s.root}>
+      <StatusBar style={T.statusBar} />
       <Text style={s.brand}>FairDrive</Text>
       {screen.name === 'ready' && (
         <Ready driver={driver} server={server} onDriver={setDriver} onServer={setServer} onStart={start} />
@@ -73,7 +71,7 @@ export default function App() {
           onNew={() => setScreen({ name: 'ready' })}
         />
       )}
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -84,18 +82,19 @@ function Ready(p: { driver: string; server: string; onDriver: (t: string) => voi
       <Text style={s.title}>Ready to drive</Text>
       <Text style={s.lead}>Your score compares you with what's normal for your roads, light and weather.</Text>
 
-      <Field label="Driver name" value={p.driver} onChange={p.onDriver} placeholder="e.g. Ana" />
-      <Field label="FairDrive server" value={p.server} onChange={p.onServer} placeholder="192.168.1.20:8000" keyboard="url" />
+      <View style={s.card}>
+        <Field label="Driver name" value={p.driver} onChange={p.onDriver} placeholder="e.g. Ana" />
+        <View style={s.cardDivider} />
+        <Field label="FairDrive server" value={p.server} onChange={p.onServer} placeholder="192.168.1.20:8000" keyboard="url" />
+      </View>
 
-      <View style={s.tips}>
+      <View style={[s.card, s.tips]}>
         <Tip text="Mount the phone firmly. Any angle works, but it mustn't move." />
         <Tip text="Keep this screen open. The phone stays awake while recording." />
         <Tip text="Drive at least 3 km so there's something to score." />
       </View>
 
-      <Pressable disabled={!canStart} onPress={p.onStart} style={({ pressed }) => [s.startButton, !canStart && s.disabled, pressed && s.pressed]}>
-        <Text style={s.startText}>Start drive</Text>
-      </Pressable>
+      <PrimaryButton label="Start drive" disabled={!canStart} onPress={p.onStart} />
     </ScrollView>
   );
 }
@@ -123,9 +122,15 @@ function Recording({ live, onStop }: { live: Live; onStop: () => void }) {
       <View style={s.center}>
         <Text style={s.bigNumber}>{live.km.toFixed(1)}</Text>
         <Text style={s.bigUnit}>km driven</Text>
-        <View style={s.stats}>
-          <Stat value={live.kmh.toFixed(0)} unit="km/h" />
-          <Stat value={live.gpsFixes > 0 ? 'Locked' : 'Searching'} unit="GPS" />
+        <View style={s.statRow}>
+          <View style={[s.card, s.stat]}>
+            <Text style={s.statValue}>{live.kmh.toFixed(0)}</Text>
+            <Text style={s.muted}>km/h</Text>
+          </View>
+          <View style={[s.card, s.stat]}>
+            <Text style={s.statValue}>{live.gpsFixes > 0 ? 'Locked' : 'Searching'}</Text>
+            <Text style={s.muted}>GPS</Text>
+          </View>
         </View>
       </View>
       <View style={s.stopArea}>
@@ -141,7 +146,7 @@ function Recording({ live, onStop }: { live: Live; onStop: () => void }) {
 function Sending() {
   return (
     <View style={[s.page, s.center]}>
-      <ActivityIndicator size="large" color={C.green} />
+      <ActivityIndicator size="large" color={T.text} />
       <Text style={[s.title, s.centerText]}>Scoring your drive</Text>
       <Text style={[s.lead, s.centerText]}>Looking up the roads, daylight and weather on your route. This can take a minute.</Text>
     </View>
@@ -164,27 +169,27 @@ function Results({ trips, onSave, onNew }: { trips: TripResult[]; onSave: () => 
 }
 
 function ScoredTrip({ trip }: { trip: Extract<TripResult, { kind: 'scored' }> }) {
-  const driving = drivingTier(trip.score.driving_score);
+  const tier = drivingTier(trip.score.driving_score);
   return (
     <View style={s.section}>
-      <View style={s.card}>
-        <Text style={s.label}>Driving score · {trip.score.km} km</Text>
-        <View style={s.heroRow}>
+      <View style={[s.card, s.hero]}>
+        <Ring value={trip.score.driving_score} colors={T.ring[tier.level]}>
           <Text style={s.heroNumber}>{trip.score.driving_score.toFixed(0)}</Text>
-          <Text style={[s.heroTier, { color: driving.color }]}>{driving.word.toUpperCase()}</Text>
-        </View>
-        <Text style={s.muted}>Compared with what's normal on your roads, in this light and weather. Yours to control.</Text>
+          <Text style={[s.heroTier, { color: T.ring[tier.level][0] }]}>{tier.word}</Text>
+        </Ring>
+        <Text style={s.cardTitle}>Driving score</Text>
+        <Text style={[s.muted, s.centerText]}>Compared with what's normal on your roads, in this light and weather, over {trip.score.km} km.</Text>
       </View>
 
       <View style={s.tileRow}>
-        <Tile label="Conditions" value={trip.score.conditions_score} note={conditionsTier(trip.score.conditions_score)} />
+        <Tile label="Conditions" value={trip.score.conditions_score} note={conditionsWord(trip.score.conditions_score)} />
         <Tile label="Old score" value={trip.score.old_score} note="Ignores conditions" />
       </View>
 
       <Text style={s.sectionTitle}>What shaped your score</Text>
       <View style={s.card}>
         {trip.score.moments.map((moment, i) => <MomentRow key={moment.kind} moment={moment} first={i === 0} />)}
-        <Text style={s.legend}>White line: what's normal for these roads, light and weather.</Text>
+        <Text style={s.legend}>The line marks what's normal for these roads, light and weather.</Text>
       </View>
       <Reasons title="In plain words" items={trip.reasons.driving_reasons} />
       <Reasons title="About the conditions" items={trip.reasons.conditions_reasons} />
@@ -192,43 +197,58 @@ function ScoredTrip({ trip }: { trip: Extract<TripResult, { kind: 'scored' }> })
   );
 }
 
+function Ring({ value, colors, children }: { value: number; colors: readonly [string, string]; children: ReactNode }) {
+  const size = 220, stroke = 18;
+  const r = (size - stroke) / 2, around = 2 * Math.PI * r;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
+        <Defs>
+          <SvgGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0" stopColor={colors[0]} />
+            <Stop offset="1" stopColor={colors[1]} />
+          </SvgGradient>
+        </Defs>
+        <Circle cx={size / 2} cy={size / 2} r={r} stroke={T.track} strokeWidth={stroke} fill="none" />
+        <Circle
+          cx={size / 2} cy={size / 2} r={r} stroke="url(#ring)" strokeWidth={stroke} fill="none" strokeLinecap="round"
+          strokeDasharray={`${(around * value) / 100} ${around}`} transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </Svg>
+      {children}
+    </View>
+  );
+}
+
 function MomentRow({ moment, first }: { moment: Moment; first: boolean }) {
   const over = moment.count > moment.normal + 0.5;
+  const colors = over ? T.ring.fair : T.ring.good;
   const scale = Math.max(moment.count, moment.normal * 2, 1);
   return (
     <View style={[s.momentRow, !first && s.momentDivider]}>
       <View style={s.momentHead}>
         <Text style={s.momentLabel}>{moment.label}</Text>
-        <Text style={[s.momentValue, { color: over ? C.amber : C.green }]}>{moment.count} · normal {moment.normal.toFixed(moment.normal < 10 ? 1 : 0)}</Text>
+        <Text style={s.momentValue}>
+          <Text style={{ color: colors[0], fontWeight: '800' }}>{moment.count}</Text>
+          <Text style={s.muted}>  normal {moment.normal.toFixed(moment.normal < 10 ? 1 : 0)}</Text>
+        </Text>
       </View>
       <View style={s.track}>
-        <View style={[s.fill, { width: `${(100 * moment.count) / scale}%`, backgroundColor: over ? C.amber : C.green }]} />
+        <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[s.fill, { width: `${(100 * moment.count) / scale}%` }]} />
         <View style={[s.normalMark, { left: `${(100 * moment.normal) / scale}%` }]} />
       </View>
     </View>
   );
 }
 
-const Tile = ({ label, value, note }: { label: string; value: number; note: string }) => (
-  <View style={[s.card, s.tile]}>
-    <Text style={s.label}>{label}</Text>
-    <Text style={s.tileNumber}>{value.toFixed(0)}</Text>
-    <Text style={s.muted}>{note}</Text>
-  </View>
-);
-
 function Problem(p: { message: string; onRetry?: () => void; onSave?: () => void; onNew: () => void }) {
   return (
     <ScrollView contentContainerStyle={s.page}>
       <Text style={s.title}>Something went wrong</Text>
-      <View style={[s.card, s.problemCard]}>
+      <View style={s.card}>
         <Text style={s.body}>{p.message}</Text>
       </View>
-      {p.onRetry && (
-        <Pressable onPress={p.onRetry} style={({ pressed }) => [s.startButton, pressed && s.pressed]}>
-          <Text style={s.startText}>Send again</Text>
-        </Pressable>
-      )}
+      {p.onRetry && <PrimaryButton label="Send again" onPress={p.onRetry} />}
       <Buttons onSave={p.onSave} onNew={p.onNew} />
     </ScrollView>
   );
@@ -238,16 +258,22 @@ function Buttons({ onSave, onNew }: { onSave?: () => void; onNew: () => void }) 
   return (
     <View style={s.buttonRow}>
       {onSave && (
-        <Pressable onPress={onSave} style={({ pressed }) => [s.secondary, pressed && s.pressed]}>
+        <Pressable onPress={onSave} style={({ pressed }) => [s.card, s.secondary, pressed && s.pressed]}>
           <Text style={s.secondaryText}>Save recording</Text>
         </Pressable>
       )}
-      <Pressable onPress={onNew} style={({ pressed }) => [s.secondary, pressed && s.pressed]}>
+      <Pressable onPress={onNew} style={({ pressed }) => [s.card, s.secondary, pressed && s.pressed]}>
         <Text style={s.secondaryText}>New drive</Text>
       </Pressable>
     </View>
   );
 }
+
+const PrimaryButton = ({ label, disabled, onPress }: { label: string; disabled?: boolean; onPress: () => void }) => (
+  <Pressable disabled={disabled} onPress={onPress} style={({ pressed }) => [s.primary, disabled && s.disabled, pressed && s.pressed]}>
+    <Text style={s.primaryText}>{label}</Text>
+  </Pressable>
+);
 
 function Field(p: { label: string; value: string; onChange: (t: string) => void; placeholder: string; keyboard?: 'url' }) {
   return (
@@ -255,7 +281,7 @@ function Field(p: { label: string; value: string; onChange: (t: string) => void;
       <Text style={s.label}>{p.label}</Text>
       <TextInput
         style={s.input} value={p.value} onChangeText={p.onChange} placeholder={p.placeholder}
-        placeholderTextColor="#55605B" autoCapitalize="none" autoCorrect={false} keyboardType={p.keyboard ?? 'default'}
+        placeholderTextColor={T.faint} autoCapitalize="none" autoCorrect={false} keyboardType={p.keyboard ?? 'default'}
       />
     </View>
   );
@@ -268,96 +294,92 @@ const Tip = ({ text }: { text: string }) => (
   </View>
 );
 
-const Stat = ({ value, unit }: { value: string; unit: string }) => (
-  <View style={s.stat}>
-    <Text style={s.statValue}>{value}</Text>
-    <Text style={s.statUnit}>{unit}</Text>
+const Tile = ({ label, value, note }: { label: string; value: number; note: string }) => (
+  <View style={[s.card, s.tile]}>
+    <Text style={s.label}>{label}</Text>
+    <Text style={s.tileNumber}>{value.toFixed(0)}</Text>
+    <Text style={s.muted}>{note}</Text>
   </View>
 );
-
-type Tier = { word: string; color: string };
 
 const Reasons = ({ title, items }: { title: string; items: string[] }) => (
   <View style={s.section}>
     <Text style={s.sectionTitle}>{title}</Text>
-    <View style={[s.card, s.reasonsCard]}>
+    <View style={[s.card, s.tips]}>
       {items.map((item) => <Tip key={item} text={item} />)}
     </View>
   </View>
 );
 
 // Same cut-offs as FairDrive's dashboard (src/fairdrive/scoring.py).
-function drivingTier(score: number): Tier {
-  if (score >= 80) return { word: 'Excellent', color: C.green };
-  if (score >= 60) return { word: 'Good', color: C.green };
-  if (score >= 40) return { word: 'Fair', color: C.amber };
-  return { word: 'Needs attention', color: C.red };
+function drivingTier(score: number): { word: string; level: 'good' | 'fair' | 'poor' } {
+  if (score >= 80) return { word: 'Excellent', level: 'good' };
+  if (score >= 60) return { word: 'Good', level: 'good' };
+  if (score >= 40) return { word: 'Fair', level: 'fair' };
+  return { word: 'Needs attention', level: 'poor' };
 }
 
-function conditionsTier(score: number): string {
-  if (score >= 80) return 'Easy roads and weather';
+function conditionsWord(score: number): string {
+  if (score >= 80) return 'Easy';
   if (score >= 60) return 'Fairly easy';
   if (score >= 40) return 'Average';
   return 'Demanding';
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.bg, paddingTop: 64 },
-  brand: { color: C.green, fontSize: 15, fontWeight: '700', letterSpacing: 0.5, paddingHorizontal: 24 },
-  page: { padding: 24, paddingBottom: 48, gap: 16 },
+  root: { flex: 1, paddingTop: 64 },
+  brand: { color: T.text, fontSize: 15, fontWeight: '800', letterSpacing: 0.4, paddingHorizontal: 20, opacity: 0.9 },
+  page: { padding: 20, paddingBottom: 48, gap: 16 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   centerText: { textAlign: 'center' },
-  title: { color: C.text, fontSize: 32, fontWeight: '700', letterSpacing: -0.5 },
-  lead: { color: C.muted, fontSize: 16, lineHeight: 23 },
-  body: { color: C.text, fontSize: 16, lineHeight: 23 },
-  muted: { color: C.muted, fontSize: 14 },
-  meta: { color: C.muted, fontSize: 13, textAlign: 'center' },
-  field: { gap: 8 },
-  label: { color: C.muted, fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8 },
-  input: { backgroundColor: C.card, borderColor: C.line, borderWidth: 1, borderRadius: 14, color: C.text, fontSize: 17, paddingHorizontal: 16, paddingVertical: 14 },
-  tips: { backgroundColor: C.card, borderRadius: 16, padding: 16, gap: 12 },
+  title: { color: T.text, fontSize: 34, fontWeight: '800', letterSpacing: -0.8 },
+  lead: { color: T.muted, fontSize: 16, lineHeight: 23 },
+  body: { color: T.text, fontSize: 16, lineHeight: 23 },
+  muted: { color: T.muted, fontSize: 14, lineHeight: 20 },
+  label: { color: T.muted, fontSize: 13, fontWeight: '600' },
+  card: { backgroundColor: T.card, borderRadius: 28, padding: 20, gap: 8, borderColor: T.cardBorder, borderWidth: 1, ...T.cardShadow },
+  cardDivider: { height: 1, backgroundColor: T.track, marginVertical: 8 },
+  cardTitle: { color: T.text, fontSize: 18, fontWeight: '700' },
+  field: { gap: 6 },
+  input: { color: T.text, fontSize: 18, fontWeight: '600', paddingVertical: 4 },
+  tips: { gap: 12 },
   tip: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
-  tipDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.green, marginTop: 8 },
-  tipText: { color: C.text, fontSize: 15, lineHeight: 21, flex: 1 },
-  startButton: { backgroundColor: C.green, borderRadius: 18, paddingVertical: 18, alignItems: 'center', marginTop: 8 },
-  startText: { color: C.onGreen, fontSize: 18, fontWeight: '700' },
+  tipDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: T.ring.good[0], marginTop: 8 },
+  tipText: { color: T.text, fontSize: 15, lineHeight: 21, flex: 1 },
+  primary: { backgroundColor: T.primary, borderRadius: 999, paddingVertical: 18, alignItems: 'center', marginTop: 4 },
+  primaryText: { color: T.onPrimary, fontSize: 17, fontWeight: '700' },
   disabled: { opacity: 0.35 },
-  pressed: { opacity: 0.75, transform: [{ scale: 0.98 }] },
-  recordingPage: { flex: 1, padding: 24, paddingBottom: 48 },
-  timerPill: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', backgroundColor: C.red, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8 },
+  pressed: { opacity: 0.8, transform: [{ scale: 0.98 }] },
+  recordingPage: { flex: 1, padding: 20, paddingBottom: 48 },
+  timerPill: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', backgroundColor: T.record, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8, marginTop: 12 },
   timerPillText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700', fontVariant: ['tabular-nums'] },
   dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FFFFFF' },
-  bigNumber: { color: C.text, fontSize: 112, fontWeight: '200', fontVariant: ['tabular-nums'], letterSpacing: -4 },
-  bigUnit: { color: C.muted, fontSize: 17, marginTop: -8, marginBottom: 32 },
-  stats: { flexDirection: 'row', gap: 12 },
-  stat: { backgroundColor: C.card, borderRadius: 16, paddingVertical: 14, width: 130, alignItems: 'center' },
-  statValue: { color: C.text, fontSize: 20, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  statUnit: { color: C.muted, fontSize: 12, marginTop: 2 },
+  bigNumber: { color: T.text, fontSize: 120, fontWeight: '800', fontVariant: ['tabular-nums'], letterSpacing: -6 },
+  bigUnit: { color: T.muted, fontSize: 17, fontWeight: '600', marginTop: -10, marginBottom: 32 },
+  statRow: { flexDirection: 'row', gap: 12 },
+  stat: { width: 140, alignItems: 'center', gap: 2 },
+  statValue: { color: T.text, fontSize: 22, fontWeight: '800', fontVariant: ['tabular-nums'] },
   stopArea: { alignItems: 'center', gap: 12 },
-  stopButton: { width: 96, height: 96, borderRadius: 48, borderWidth: 4, borderColor: C.text, alignItems: 'center', justifyContent: 'center' },
-  stopSquare: { width: 34, height: 34, borderRadius: 8, backgroundColor: C.red },
+  stopButton: { width: 92, height: 92, borderRadius: 46, backgroundColor: T.record, alignItems: 'center', justifyContent: 'center', ...T.cardShadow },
+  stopSquare: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#FFFFFF' },
   section: { gap: 12 },
-  sectionTitle: { color: C.text, fontSize: 20, fontWeight: '700', marginTop: 8 },
-  card: { backgroundColor: C.card, borderRadius: 20, padding: 20, gap: 8, borderColor: C.line, borderWidth: 1 },
-  problemCard: { borderColor: '#4A2422' },
-  cardTitle: { color: C.text, fontSize: 18, fontWeight: '600' },
-  heroRow: { flexDirection: 'row', alignItems: 'baseline', gap: 12 },
-  heroNumber: { color: C.text, fontSize: 88, fontWeight: '300', fontVariant: ['tabular-nums'], letterSpacing: -3 },
-  heroTier: { fontSize: 16, fontWeight: '800', letterSpacing: 1.2 },
+  sectionTitle: { color: T.text, fontSize: 21, fontWeight: '800', letterSpacing: -0.3, marginTop: 8 },
+  hero: { alignItems: 'center', paddingVertical: 28, gap: 12 },
+  heroNumber: { color: T.text, fontSize: 72, fontWeight: '800', fontVariant: ['tabular-nums'], letterSpacing: -3 },
+  heroTier: { fontSize: 15, fontWeight: '800', marginTop: -4 },
   tileRow: { flexDirection: 'row', gap: 12 },
-  tile: { flex: 1, gap: 4 },
-  tileNumber: { color: C.text, fontSize: 40, fontWeight: '300', fontVariant: ['tabular-nums'] },
+  tile: { flex: 1, gap: 2 },
+  tileNumber: { color: T.text, fontSize: 40, fontWeight: '800', fontVariant: ['tabular-nums'], letterSpacing: -1 },
   momentRow: { gap: 10, paddingVertical: 10 },
-  momentDivider: { borderTopColor: C.line, borderTopWidth: 1 },
+  momentDivider: { borderTopColor: T.track, borderTopWidth: 1 },
   momentHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  momentLabel: { color: C.text, fontSize: 16, fontWeight: '600' },
-  momentValue: { fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
-  track: { height: 6, borderRadius: 3, backgroundColor: C.line },
-  fill: { height: 6, borderRadius: 3 },
-  normalMark: { position: 'absolute', top: -4, width: 2, height: 14, borderRadius: 1, backgroundColor: C.text },
-  reasonsCard: { gap: 12 },
-  legend: { color: C.muted, fontSize: 13, marginTop: 4 },
+  momentLabel: { color: T.text, fontSize: 16, fontWeight: '700' },
+  momentValue: { fontSize: 16, fontVariant: ['tabular-nums'] },
+  track: { height: 10, borderRadius: 5, backgroundColor: T.track },
+  fill: { height: 10, borderRadius: 5 },
+  normalMark: { position: 'absolute', top: -4, width: 3, height: 18, borderRadius: 2, backgroundColor: T.text },
+  legend: { color: T.muted, fontSize: 13, marginTop: 4 },
   buttonRow: { flexDirection: 'row', gap: 12 },
-  secondary: { flex: 1, borderColor: C.line, borderWidth: 1, borderRadius: 16, paddingVertical: 15, alignItems: 'center' },
-  secondaryText: { color: C.text, fontSize: 16, fontWeight: '600' },
+  secondary: { flex: 1, paddingVertical: 16, alignItems: 'center' },
+  secondaryText: { color: T.text, fontSize: 16, fontWeight: '700' },
 });
