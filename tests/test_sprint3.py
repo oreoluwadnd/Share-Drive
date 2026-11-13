@@ -132,10 +132,18 @@ def test_score_and_explain_a_trip(client, store):
     assert len(explain["driving_reasons"]) == 3 and len(explain["conditions_reasons"]) == 3
 
 
+def test_score_lists_each_kind_of_harsh_moment_against_normal(client, store):
+    trip_id = store.list()["trip_id"].iloc[2]  # driver0, normal driving, highway: 4 incidents in the scored km
+    moments = client.get(f"/trips/{trip_id}/score").json()["moments"]
+    assert [m["kind"] for m in moments] == ["hard_brake", "hard_accel", "hard_corner"]
+    assert [m["label"] for m in moments] == ["Hard braking", "Sharp speeding up", "Sharp turns"]
+    assert all(m["count"] == 4 and m["normal"] > 0 for m in moments), moments
+
+
 def test_upload_a_valid_trip(client, store, tmp_path):
     from tests import synthetic
-    path = synthetic.write(synthetic.to_records(synthetic.simulate(synthetic.city_drive(5))), tmp_path / "trip.zip")
-    response = client.post("/trips", files={"file": ("trip.zip", path.read_bytes())}, data={"driver": "ana"})
+    path = synthetic.write(synthetic.to_records(synthetic.simulate(synthetic.city_drive(5))), tmp_path / "trip.json")
+    response = client.post("/trips", files={"file": ("trip.json", path.read_bytes())}, data={"driver": "ana"})
     assert response.status_code == 201
     [trip] = response.json()["trips"]
     assert trip["trip_id"].startswith("ana-") and trip["flag"] is None
@@ -145,10 +153,18 @@ def test_upload_a_valid_trip(client, store, tmp_path):
 
 
 def test_invalid_file_is_a_400_naming_the_problem(client, store):
-    response = client.post("/trips", files={"file": ("trip.json", b"[]")}, data={"driver": "ana"})
+    response = client.post("/trips", files={"file": ("trip.json", b"{}")}, data={"driver": "ana"})
     assert response.status_code == 400
-    assert "not a Sensor Logger zip export" in response.json()["detail"]
+    assert "not a Sensor Logger JSON export" in response.json()["detail"]
 
 
 def test_unknown_trip_is_a_404(client):
     assert client.get("/trips/nobody-20260101T000000Z/score").status_code == 404
+
+
+def test_tagged_trip_too_short_to_score_says_so(client, store):
+    from tests.conftest import add_tagged_trip
+    trip_id = add_tagged_trip(store, "shorty", "residential", 0.8, 0, 99, "calm")
+    response = client.get(f"/trips/{trip_id}/score")
+    assert response.status_code == 422
+    assert "less than 1 km" in response.json()["detail"]

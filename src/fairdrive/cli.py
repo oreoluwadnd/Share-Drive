@@ -30,7 +30,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--data-dir", type=Path, default=Path("data"), help="where trips are stored (default: data)")
     commands = parser.add_subparsers(dest="command", required=True)
 
-    upload_cmd = commands.add_parser("upload", help="upload a Sensor Logger zip export")
+    upload_cmd = commands.add_parser("upload", help="upload a Sensor Logger JSON export")
     upload_cmd.add_argument("file", type=Path)
     upload_cmd.add_argument("--driver", required=True)
     uah_cmd = commands.add_parser("load-uah", help="load the UAH-DriveSet public dataset")
@@ -49,7 +49,7 @@ def main(argv: list[str] | None = None) -> None:
     commands.add_parser("leakage", help="does the driving score give away the road type or darkness?")
     commands.add_parser("phones", help="sensor noise and score spread per phone model")
     commands.add_parser("dashboard", help="open the dashboard in the browser")
-    commands.add_parser("api", help=f"serve scores over HTTP on port {API_PORT} (docs at /docs)")
+    commands.add_parser("api", help=f"serve scores on port {API_PORT} to this computer and phones on the same Wi-Fi (docs at /docs)")
 
     args = parser.parse_args(argv)
     store = TripStore(args.data_dir)
@@ -117,4 +117,4 @@ def main(argv: list[str] | None = None) -> None:
         subprocess.run([sys.executable, "-m", "streamlit", "run", str(APP)], env=env, check=True)
     elif args.command == "api":
         env = {**os.environ, "FAIRDRIVE_DATA": str(args.data_dir.resolve())}
-        subprocess.run([sys.executable, "-m", "uvicorn", "fairdrive.api:app", "--port", str(API_PORT)], env=env, check=True)
+        subprocess.run([sys.executable, "-m", "uvicorn", "fairdrive.api:app", "--host", "0.0.0.0", "--port", str(API_PORT)], env=env, check=True)

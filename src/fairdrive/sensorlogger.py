@@ -1,7 +1,6 @@
-"""Read Sensor Logger zip exports: one CSV per sensor plus Metadata.csv."""
+"""Read Sensor Logger JSON exports: a list of records, each tagged with its sensor."""
 
-import io
-import zipfile
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -13,7 +12,7 @@ REQUIRED = {
     "Gravity": ("x", "y", "z"),
     "Location": ("latitude", "longitude", "speed", "bearing"),
 }
-PHONE_COLUMNS = {"device name": "device", "platform": "platform"}
+PHONE_FIELDS = {"device name": "device", "platform": "platform"}
 
 
 class RecordingError(ValueError):
@@ -26,41 +25,40 @@ class MissingColumnError(RecordingError):
         super().__init__(f"Missing column(s): {', '.join(columns)}")
 
 
-def read_recording(path: Path) -> tuple[dict[str, pd.DataFrame], dict]:
-    """Return ({sensor: DataFrame indexed by UTC time}, {"device", "platform"}).
+def read_recording(path: Path) -> tuple[dict[str, pd.DataFrame], dict | None]:
+    """Return ({sensor: DataFrame indexed by UTC time}, {"device", "platform"} or None).
 
-    Raises MissingColumnError naming every required column that is absent, and RecordingError
-    when a sensor was switched on but recorded nothing.
+    The phone comes from a "Metadata" record when the file has one (the FairDrive app always writes it).
+    Raises RecordingError when a sensor recorded nothing, MissingColumnError naming every absent column.
     """
-    if not zipfile.is_zipfile(path):
-        raise RecordingError(f"{Path(path).name} is not a Sensor Logger zip export")
-    with zipfile.ZipFile(path) as archive:
-        names = set(archive.namelist())
-        tables = {name: _csv(archive, f"{name}.csv") for name in [*REQUIRED, "Metadata"] if f"{name}.csv" in names}
+    try:
+        records = json.loads(Path(path).read_text())
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        records = None
+    if not isinstance(records, list):
+        raise RecordingError(f"{Path(path).name} is not a Sensor Logger JSON export")
 
-    empty = [name for name, table in tables.items() if table is None or table.empty]
+    by_sensor: dict[str, list[dict]] = {}
+    for record in records:
+        by_sensor.setdefault(record["sensor"], []).append(record)
+
+    empty = [sensor for sensor in REQUIRED if not by_sensor.get(sensor)]
     if empty:
-        raise RecordingError(f"No readings in {', '.join(empty)}. Check the phone let Sensor Logger record them "
-                             "(for Location: Settings → Sensor Logger → Location → Always)")
-    missing = [f"{sensor}.{c}" for sensor, columns in REQUIRED.items() for c in ("time", *columns)
-               if c not in tables.get(sensor, pd.DataFrame()).columns]
-    missing += [f"Metadata.{c}" for c in PHONE_COLUMNS if c not in tables.get("Metadata", pd.DataFrame()).columns]
+        raise RecordingError(f"No readings in {', '.join(empty)}. Check the phone let the app record them "
+                             "(for Location: Settings → the app → Location → Always)")
+    missing = [f"{sensor}.{c}" for sensor, columns in REQUIRED.items() for c in ("time", *columns) if c not in by_sensor[sensor][0]]
     if missing:
         raise MissingColumnError(missing)
 
-    sensors = {sensor: _by_time(tables[sensor], columns) for sensor, columns in REQUIRED.items()}
-    meta = tables["Metadata"].iloc[0]
-    return sensors, {key: str(meta[column]) for column, key in PHONE_COLUMNS.items()}
+    sensors = {sensor: _to_frame(by_sensor[sensor], columns) for sensor, columns in REQUIRED.items()}
+    meta = (by_sensor.get("Metadata") or [{}])[0]
+    phone = {key: str(meta[field]) for field, key in PHONE_FIELDS.items()} if all(f in meta for f in PHONE_FIELDS) else None
+    return sensors, phone
 
 
-def _csv(archive: zipfile.ZipFile, name: str) -> pd.DataFrame | None:
-    """None for a 0-byte file (a sensor that recorded nothing)."""
-    data = archive.read(name)
-    return pd.read_csv(io.BytesIO(data)) if data.strip() else None
-
-
-def _by_time(table: pd.DataFrame, columns: tuple[str, ...]) -> pd.DataFrame:
-    df = table[["time", *columns]].apply(pd.to_numeric)
+def _to_frame(rows: list[dict], columns: tuple[str, ...]) -> pd.DataFrame:
+    df = pd.DataFrame(rows, columns=["time", *columns])
+    df = df.apply(pd.to_numeric)
     df.index = pd.to_datetime(df.pop("time").astype("int64"), unit="ns", utc=True)
     df = df[~df.index.duplicated()].sort_index()
     return df

@@ -15,7 +15,7 @@ Each score comes with three plain-language reasons. The old way of scoring is ke
 
 ## How it works
 
-1. **Record** a drive with the free Sensor Logger app and export the zip.
+1. **Record** a drive with the FairDrive phone app (sends it straight to FairDrive and shows the scores), or with the free Sensor Logger app and export it as JSON.
 2. **Upload** it (dashboard, command line or API). FairDrive checks it, splits it into trips, turns the phone's readings into the car's forward, sideways and up directions using GPS (works for any mount and for iPhone and Android), and removes the first and last 500 m so home and work aren't stored.
 3. **Tag** each trip with road type and speed limit (OpenStreetMap), daylight or dark, and weather (Environment Canada).
 4. **Count** harsh moments: any push of 0.15 g or more; pushes within 1 second count once.
@@ -40,12 +40,12 @@ Data: UAH-DriveSet (6 drivers, 37 scored trips, 682 km, Spain). Commands reprodu
 | FD-25: fair across phones | noise reported per phone | built; needs drives from 2+ phones | pending data |
 | FD-26: API | scores and reasons as JSON, 400 on bad files | done | yes |
 | FD-27: model cards | | `docs/model-cards.md` | yes |
-| FD-28: phone recording | | Sensor Logger used instead of building an app | by decision |
+| FD-28: phone recording | record with one tap, export in Sensor Logger's format | FairDrive phone app (Expo): records, sends to the API, shows both scores with reasons. Screen must stay on | yes, partly |
 | FD-29: fairness audit | | `docs/fairness-audit.md` | yes |
 | FD-30: full flow, 10 trips | all scored with reasons, no errors | 10 test recordings and all 37 scorable UAH trips pass; no open bugs | yes |
 | FD-32 to 34: driver attention from video | | cut (needs video of the driver; UAH films the road) | cut |
 
-**Tests:** 60 automated tests (`uv run pytest`), including the 10-trip end-to-end test.
+**Tests:** 63 automated tests (`uv run pytest`), including the 10-trip end-to-end test.
 
 ## What we learned
 
@@ -63,6 +63,7 @@ Data: UAH-DriveSet (6 drivers, 37 scored trips, 682 km, Spain). Commands reprodu
 - No weather in the training data, so weather effects aren't learned yet.
 - Only 4 night trips.
 - 6 drivers. Every number above could move with more drivers.
+- The phone app only records with its screen on: phones pause motion readings for apps in the background. Recording with the screen locked needs a custom build.
 
 ## Next steps
 
@@ -83,7 +84,8 @@ uv run fairdrive dashboard      # http://localhost:8501
 
 1. **My trips:** pick a driver, show both scores, the old score and the trend.
 2. **Trip details:** open a trip and read the reasons. Show the route, speed against the limit, and the hard brakes on the chart.
-3. **Upload:** in the sidebar, upload a Sensor Logger zip and press **Add road, time and weather**. The trip appears with scores and reasons.
+3. **Upload:** in the sidebar, upload a Sensor Logger JSON file and press **Add road, time and weather**. The trip appears with scores and reasons.
 4. **FairDrive vs old score:** show the urban and highway rows: the old score's 18.9-point gap, FairDrive's 1.3.
 5. **Score stability:** show that normal driving is 61.6% steadier, and say plainly why drowsy driving isn't.
-6. Optional: `uv run fairdrive api` and open http://localhost:8000/docs to show the API.
+6. **Phone app:** start `uv run fairdrive api`, open the app in Expo Go (see `mobile/README.md`), and show a short recorded drive going from **Stop** to the score ring, the headline and the reasons. Record it in the car beforehand if a live drive isn't possible.
+7. Optional: open http://localhost:8000/docs to show the API.
