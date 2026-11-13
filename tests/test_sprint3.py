@@ -132,6 +132,14 @@ def test_score_and_explain_a_trip(client, store):
     assert len(explain["driving_reasons"]) == 3 and len(explain["conditions_reasons"]) == 3
 
 
+def test_score_lists_each_kind_of_harsh_moment_against_normal(client, store):
+    trip_id = store.list()["trip_id"].iloc[2]  # driver0, normal driving, highway: 4 incidents in the scored km
+    moments = client.get(f"/trips/{trip_id}/score").json()["moments"]
+    assert [m["kind"] for m in moments] == ["hard_brake", "hard_accel", "hard_corner"]
+    assert [m["label"] for m in moments] == ["Hard braking", "Sharp speeding up", "Sharp turns"]
+    assert all(m["count"] == 4 and m["normal"] > 0 for m in moments), moments
+
+
 def test_upload_a_valid_trip(client, store, tmp_path):
     from tests import synthetic
     path = synthetic.write(synthetic.to_records(synthetic.simulate(synthetic.city_drive(5))), tmp_path / "trip.json")

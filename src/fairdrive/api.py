@@ -1,7 +1,7 @@
 """Scores through an API (FD-26). Start it with `uv run fairdrive api`.
 
 POST /trips                    upload a Sensor Logger JSON export (form fields: file, driver); adds road, time and weather
-GET  /trips/{trip_id}/score    both scores and the old score
+GET  /trips/{trip_id}/score    both scores, the old score, and each kind of harsh moment against what's normal
 GET  /trips/{trip_id}/explain  three plain-language reasons for each score
 """
 
@@ -24,6 +24,7 @@ from fairdrive.upload import upload
 store = TripStore(Path(os.environ.get("FAIRDRIVE_DATA", "data")))
 app = FastAPI(title="FairDrive", description="Driving scores that judge you against what is normal for your roads, time and weather.")
 _cache: dict[tuple, pd.DataFrame] = {}
+MOMENT_LABELS = {"hard_brake": "Hard braking", "hard_accel": "Sharp speeding up", "hard_corner": "Sharp turns"}
 
 
 @app.post("/trips", status_code=201)
@@ -50,7 +51,9 @@ def add_trip(file: UploadFile, driver: str = Form()) -> dict:
 def score(trip_id: str) -> dict:
     row = _scored(trip_id)
     return {"trip_id": trip_id, "driver": row["driver"], "km": int(row["km"]), "driving_score": float(row["driving_score"]),
-            "conditions_score": float(row["conditions_score"]), "old_score": float(row["baseline_score"])}
+            "conditions_score": float(row["conditions_score"]), "old_score": float(row["baseline_score"]),
+            "moments": [{"kind": kind, "label": label, "count": int(row[kind]), "normal": round(float(row[f"expected_{kind}"]), 1)}
+                        for kind, label in MOMENT_LABELS.items()]}
 
 
 @app.get("/trips/{trip_id}/explain")

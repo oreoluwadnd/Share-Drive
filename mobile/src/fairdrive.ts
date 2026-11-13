@@ -2,7 +2,8 @@
 
 import { File, UploadTask, UploadType } from 'expo-file-system';
 
-export type Score = { driving_score: number; conditions_score: number; old_score: number; km: number };
+export type Moment = { kind: string; label: string; count: number; normal: number };
+export type Score = { driving_score: number; conditions_score: number; old_score: number; km: number; moments: Moment[] };
 export type Reasons = { driving_reasons: string[]; conditions_reasons: string[] };
 export type TripResult = { tripId: string; distanceKm: number } & (
   | { kind: 'scored'; score: Score; reasons: Reasons }

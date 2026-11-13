@@ -5,7 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { sendTrip, serverUrl, TripResult } from './src/fairdrive';
+import { Moment, sendTrip, serverUrl, TripResult } from './src/fairdrive';
 import { Live, Recorder } from './src/recorder';
 
 const C = {
@@ -105,7 +105,7 @@ function Recording({ live, onStop }: { live: Live; onStop: () => void }) {
   const pulse = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     const loop = Animated.loop(Animated.sequence([
-      Animated.timing(pulse, { toValue: 0.3, duration: 700, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 0.25, duration: 700, useNativeDriver: true }),
       Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
     ]));
     loop.start();
@@ -115,21 +115,25 @@ function Recording({ live, onStop }: { live: Live; onStop: () => void }) {
   const minutes = Math.floor(live.seconds / 60);
   const seconds = Math.floor(live.seconds % 60).toString().padStart(2, '0');
   return (
-    <View style={[s.page, s.center]}>
-      <View style={s.recordingBadge}>
+    <View style={s.recordingPage}>
+      <View style={s.timerPill}>
         <Animated.View style={[s.dot, { opacity: pulse }]} />
-        <Text style={s.recordingText}>Recording</Text>
+        <Text style={s.timerPillText}>{minutes}:{seconds}</Text>
       </View>
-      <Text style={s.timer}>{minutes}:{seconds}</Text>
-      <View style={s.stats}>
-        <Stat value={live.km.toFixed(1)} unit="km" />
-        <Stat value={live.kmh.toFixed(0)} unit="km/h" />
-        <Stat value={live.gpsFixes > 0 ? 'On' : 'Waiting'} unit="GPS" />
+      <View style={s.center}>
+        <Text style={s.bigNumber}>{live.km.toFixed(1)}</Text>
+        <Text style={s.bigUnit}>km driven</Text>
+        <View style={s.stats}>
+          <Stat value={live.kmh.toFixed(0)} unit="km/h" />
+          <Stat value={live.gpsFixes > 0 ? 'Locked' : 'Searching'} unit="GPS" />
+        </View>
       </View>
-      <Pressable onPress={onStop} style={({ pressed }) => [s.stopButton, pressed && s.pressed]}>
-        <View style={s.stopSquare} />
-      </Pressable>
-      <Text style={s.muted}>Tap to finish and get your score</Text>
+      <View style={s.stopArea}>
+        <Pressable onPress={onStop} style={({ pressed }) => [s.stopButton, pressed && s.pressed]}>
+          <View style={s.stopSquare} />
+        </Pressable>
+        <Text style={s.muted}>Finish and get your score</Text>
+      </View>
     </View>
   );
 }
@@ -148,31 +152,70 @@ function Results({ trips, onSave, onNew }: { trips: TripResult[]; onSave: () => 
   return (
     <ScrollView contentContainerStyle={s.page}>
       <Text style={s.title}>{trips.length === 1 ? 'Your drive' : `${trips.length} drives`}</Text>
-      {trips.map((trip) => (
+      {trips.map((trip) => trip.kind === 'scored' ? <ScoredTrip key={trip.tripId} trip={trip} /> : (
         <View key={trip.tripId} style={s.card}>
-          {trip.kind === 'scored' ? (
-            <>
-              <View style={s.scoreRow}>
-                <ScoreBlock label="Driving" value={trip.score.driving_score} tier={drivingTier(trip.score.driving_score)} hint="Yours to control" />
-                <View style={s.divider} />
-                <ScoreBlock label="Conditions" value={trip.score.conditions_score} tier={conditionsTier(trip.score.conditions_score)} hint="100 = easiest" />
-              </View>
-              <Text style={s.meta}>{trip.score.km} km scored · old score {trip.score.old_score.toFixed(0)}</Text>
-              <Reasons title="Your driving" items={trip.reasons.driving_reasons} />
-              <Reasons title="The conditions" items={trip.reasons.conditions_reasons} />
-            </>
-          ) : (
-            <>
-              <Text style={s.cardTitle}>Not scored · {trip.distanceKm.toFixed(1)} km</Text>
-              <Text style={s.body}>{trip.why}</Text>
-            </>
-          )}
+          <Text style={s.cardTitle}>Not scored · {trip.distanceKm.toFixed(1)} km</Text>
+          <Text style={s.body}>{trip.why}</Text>
         </View>
       ))}
       <Buttons onSave={onSave} onNew={onNew} />
     </ScrollView>
   );
 }
+
+function ScoredTrip({ trip }: { trip: Extract<TripResult, { kind: 'scored' }> }) {
+  const driving = drivingTier(trip.score.driving_score);
+  return (
+    <View style={s.section}>
+      <View style={s.card}>
+        <Text style={s.label}>Driving score · {trip.score.km} km</Text>
+        <View style={s.heroRow}>
+          <Text style={s.heroNumber}>{trip.score.driving_score.toFixed(0)}</Text>
+          <Text style={[s.heroTier, { color: driving.color }]}>{driving.word.toUpperCase()}</Text>
+        </View>
+        <Text style={s.muted}>Compared with what's normal on your roads, in this light and weather. Yours to control.</Text>
+      </View>
+
+      <View style={s.tileRow}>
+        <Tile label="Conditions" value={trip.score.conditions_score} note={conditionsTier(trip.score.conditions_score)} />
+        <Tile label="Old score" value={trip.score.old_score} note="Ignores conditions" />
+      </View>
+
+      <Text style={s.sectionTitle}>What shaped your score</Text>
+      <View style={s.card}>
+        {trip.score.moments.map((moment, i) => <MomentRow key={moment.kind} moment={moment} first={i === 0} />)}
+        <Text style={s.legend}>White line: what's normal for these roads, light and weather.</Text>
+      </View>
+      <Reasons title="In plain words" items={trip.reasons.driving_reasons} />
+      <Reasons title="About the conditions" items={trip.reasons.conditions_reasons} />
+    </View>
+  );
+}
+
+function MomentRow({ moment, first }: { moment: Moment; first: boolean }) {
+  const over = moment.count > moment.normal + 0.5;
+  const scale = Math.max(moment.count, moment.normal * 2, 1);
+  return (
+    <View style={[s.momentRow, !first && s.momentDivider]}>
+      <View style={s.momentHead}>
+        <Text style={s.momentLabel}>{moment.label}</Text>
+        <Text style={[s.momentValue, { color: over ? C.amber : C.green }]}>{moment.count} · normal {moment.normal.toFixed(moment.normal < 10 ? 1 : 0)}</Text>
+      </View>
+      <View style={s.track}>
+        <View style={[s.fill, { width: `${(100 * moment.count) / scale}%`, backgroundColor: over ? C.amber : C.green }]} />
+        <View style={[s.normalMark, { left: `${(100 * moment.normal) / scale}%` }]} />
+      </View>
+    </View>
+  );
+}
+
+const Tile = ({ label, value, note }: { label: string; value: number; note: string }) => (
+  <View style={[s.card, s.tile]}>
+    <Text style={s.label}>{label}</Text>
+    <Text style={s.tileNumber}>{value.toFixed(0)}</Text>
+    <Text style={s.muted}>{note}</Text>
+  </View>
+);
 
 function Problem(p: { message: string; onRetry?: () => void; onSave?: () => void; onNew: () => void }) {
   return (
@@ -234,21 +277,12 @@ const Stat = ({ value, unit }: { value: string; unit: string }) => (
 
 type Tier = { word: string; color: string };
 
-const ScoreBlock = ({ label, value, tier, hint }: { label: string; value: number; tier: Tier; hint: string }) => (
-  <View style={s.scoreBlock}>
-    <Text style={s.label}>{label}</Text>
-    <Text style={[s.scoreValue, { color: tier.color }]}>{value.toFixed(0)}</Text>
-    <View style={[s.pill, { borderColor: tier.color }]}>
-      <Text style={[s.pillText, { color: tier.color }]}>{tier.word}</Text>
-    </View>
-    <Text style={s.hint}>{hint}</Text>
-  </View>
-);
-
 const Reasons = ({ title, items }: { title: string; items: string[] }) => (
-  <View style={s.reasons}>
-    <Text style={s.reasonsTitle}>{title}</Text>
-    {items.map((item) => <Tip key={item} text={item} />)}
+  <View style={s.section}>
+    <Text style={s.sectionTitle}>{title}</Text>
+    <View style={[s.card, s.reasonsCard]}>
+      {items.map((item) => <Tip key={item} text={item} />)}
+    </View>
   </View>
 );
 
@@ -260,11 +294,11 @@ function drivingTier(score: number): Tier {
   return { word: 'Needs attention', color: C.red };
 }
 
-function conditionsTier(score: number): Tier {
-  if (score >= 80) return { word: 'Easy', color: C.text };
-  if (score >= 60) return { word: 'Fairly easy', color: C.text };
-  if (score >= 40) return { word: 'Average', color: C.text };
-  return { word: 'Demanding', color: C.text };
+function conditionsTier(score: number): string {
+  if (score >= 80) return 'Easy roads and weather';
+  if (score >= 60) return 'Fairly easy';
+  if (score >= 40) return 'Average';
+  return 'Demanding';
 }
 
 const s = StyleSheet.create({
@@ -289,28 +323,40 @@ const s = StyleSheet.create({
   startText: { color: C.onGreen, fontSize: 18, fontWeight: '700' },
   disabled: { opacity: 0.35 },
   pressed: { opacity: 0.75, transform: [{ scale: 0.98 }] },
-  recordingBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#2A1413', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6 },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: C.red },
-  recordingText: { color: C.red, fontWeight: '700', fontSize: 14 },
-  timer: { color: C.text, fontSize: 84, fontWeight: '200', fontVariant: ['tabular-nums'], marginVertical: 8 },
-  stats: { flexDirection: 'row', gap: 12, marginBottom: 32 },
-  stat: { backgroundColor: C.card, borderRadius: 16, paddingVertical: 14, width: 100, alignItems: 'center' },
-  statValue: { color: C.text, fontSize: 22, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  recordingPage: { flex: 1, padding: 24, paddingBottom: 48 },
+  timerPill: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', backgroundColor: C.red, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8 },
+  timerPillText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FFFFFF' },
+  bigNumber: { color: C.text, fontSize: 112, fontWeight: '200', fontVariant: ['tabular-nums'], letterSpacing: -4 },
+  bigUnit: { color: C.muted, fontSize: 17, marginTop: -8, marginBottom: 32 },
+  stats: { flexDirection: 'row', gap: 12 },
+  stat: { backgroundColor: C.card, borderRadius: 16, paddingVertical: 14, width: 130, alignItems: 'center' },
+  statValue: { color: C.text, fontSize: 20, fontWeight: '600', fontVariant: ['tabular-nums'] },
   statUnit: { color: C.muted, fontSize: 12, marginTop: 2 },
-  stopButton: { width: 96, height: 96, borderRadius: 48, borderWidth: 4, borderColor: C.text, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  stopArea: { alignItems: 'center', gap: 12 },
+  stopButton: { width: 96, height: 96, borderRadius: 48, borderWidth: 4, borderColor: C.text, alignItems: 'center', justifyContent: 'center' },
   stopSquare: { width: 34, height: 34, borderRadius: 8, backgroundColor: C.red },
-  card: { backgroundColor: C.card, borderRadius: 20, padding: 20, gap: 14, borderColor: C.line, borderWidth: 1 },
+  section: { gap: 12 },
+  sectionTitle: { color: C.text, fontSize: 20, fontWeight: '700', marginTop: 8 },
+  card: { backgroundColor: C.card, borderRadius: 20, padding: 20, gap: 8, borderColor: C.line, borderWidth: 1 },
   problemCard: { borderColor: '#4A2422' },
   cardTitle: { color: C.text, fontSize: 18, fontWeight: '600' },
-  scoreRow: { flexDirection: 'row' },
-  divider: { width: 1, backgroundColor: C.line, marginHorizontal: 8 },
-  scoreBlock: { flex: 1, alignItems: 'center', gap: 6 },
-  scoreValue: { fontSize: 56, fontWeight: '700', fontVariant: ['tabular-nums'], letterSpacing: -1 },
-  pill: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
-  pillText: { fontSize: 13, fontWeight: '600' },
-  hint: { color: C.muted, fontSize: 12 },
-  reasons: { gap: 10, borderTopColor: C.line, borderTopWidth: 1, paddingTop: 14 },
-  reasonsTitle: { color: C.text, fontSize: 15, fontWeight: '700' },
+  heroRow: { flexDirection: 'row', alignItems: 'baseline', gap: 12 },
+  heroNumber: { color: C.text, fontSize: 88, fontWeight: '300', fontVariant: ['tabular-nums'], letterSpacing: -3 },
+  heroTier: { fontSize: 16, fontWeight: '800', letterSpacing: 1.2 },
+  tileRow: { flexDirection: 'row', gap: 12 },
+  tile: { flex: 1, gap: 4 },
+  tileNumber: { color: C.text, fontSize: 40, fontWeight: '300', fontVariant: ['tabular-nums'] },
+  momentRow: { gap: 10, paddingVertical: 10 },
+  momentDivider: { borderTopColor: C.line, borderTopWidth: 1 },
+  momentHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  momentLabel: { color: C.text, fontSize: 16, fontWeight: '600' },
+  momentValue: { fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  track: { height: 6, borderRadius: 3, backgroundColor: C.line },
+  fill: { height: 6, borderRadius: 3 },
+  normalMark: { position: 'absolute', top: -4, width: 2, height: 14, borderRadius: 1, backgroundColor: C.text },
+  reasonsCard: { gap: 12 },
+  legend: { color: C.muted, fontSize: 13, marginTop: 4 },
   buttonRow: { flexDirection: 'row', gap: 12 },
   secondary: { flex: 1, borderColor: C.line, borderWidth: 1, borderRadius: 16, paddingVertical: 15, alignItems: 'center' },
   secondaryText: { color: C.text, fontSize: 16, fontWeight: '600' },
