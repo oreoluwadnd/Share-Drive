@@ -49,6 +49,7 @@ uv run fairdrive phones                               # sensor noise and score s
 uv run fairdrive braking-study path/to/UAH-DRIVESET-v1 # can the phone tell planned stops from panic stops?
 uv run fairdrive dashboard                            # the web dashboard
 uv run fairdrive api                                  # scores over HTTP on port 8000 (docs at http://localhost:8000/docs)
+uv run fairdrive add-admin you@example.com            # admin account for the web dashboard (asks for a password)
 ```
 
 `tag` can be re-run any time. It skips trips that are done and fills in weather that Environment Canada hadn't published yet (it runs a few days behind).
@@ -77,6 +78,8 @@ curl localhost:8000/trips/<trip_id>/explain                         # three reas
 ```
 
 A file that can't be used gets a 400 that names the problem.
+
+The admin web dashboard (every trip, with scores, reasons and route) is the same Expo app opened in a browser; see `mobile/README.md`.
 
 ## Recording a drive
 

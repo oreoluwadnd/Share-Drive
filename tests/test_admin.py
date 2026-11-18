@@ -1,0 +1,100 @@
+"""Admin accounts and the admin endpoints the web dashboard uses."""
+
+import pytest
+
+from fairdrive.admins import AdminAccounts
+from fairdrive.cli import main
+
+PASSWORD = "correct horse battery"
+
+
+@pytest.fixture
+def client(store, monkeypatch):
+    from fastapi.testclient import TestClient
+    from fairdrive import api
+    monkeypatch.setattr(api, "store", store)
+    monkeypatch.setattr(api, "admins", AdminAccounts(store.root / "admins.json"))
+    api._cache.clear()
+    api._sessions.clear()
+    api.admins.add("ana@example.com", PASSWORD)
+    return TestClient(api.app)
+
+
+def login(client) -> dict:
+    token = client.post("/admin/login", json={"email": "ana@example.com", "password": PASSWORD}).json()["token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+# Accounts
+
+def test_password_is_stored_hashed_and_checked(tmp_path):
+    accounts = AdminAccounts(tmp_path / "admins.json")
+    accounts.add("Ana@Example.com", PASSWORD)
+    assert PASSWORD not in (tmp_path / "admins.json").read_text()
+    assert accounts.check("ana@example.com", PASSWORD)  # email case doesn't matter
+    assert not accounts.check("ana@example.com", "wrong password")
+    assert not accounts.check("ben@example.com", PASSWORD)
+
+
+def test_duplicate_admin_and_short_password_are_refused(tmp_path):
+    accounts = AdminAccounts(tmp_path / "admins.json")
+    accounts.add("ana@example.com", PASSWORD)
+    with pytest.raises(ValueError, match="already"):
+        accounts.add("ana@example.com", PASSWORD)
+    with pytest.raises(ValueError, match="at least 8"):
+        accounts.add("ben@example.com", "short")
+
+
+def test_cli_adds_an_admin(tmp_path, monkeypatch):
+    monkeypatch.setattr("fairdrive.cli.getpass", lambda prompt: PASSWORD)
+    main(["--data-dir", str(tmp_path), "add-admin", "ben@example.com"])
+    assert AdminAccounts(tmp_path / "admins.json").check("ben@example.com", PASSWORD)
+
+
+def test_cli_refuses_passwords_that_dont_match(tmp_path, monkeypatch):
+    answers = iter([PASSWORD, "something else"])
+    monkeypatch.setattr("fairdrive.cli.getpass", lambda prompt: next(answers))
+    with pytest.raises(SystemExit, match="didn't match"):
+        main(["--data-dir", str(tmp_path), "add-admin", "ben@example.com"])
+
+
+# Endpoints
+
+def test_wrong_password_is_refused(client):
+    response = client.post("/admin/login", json={"email": "ana@example.com", "password": "nope"})
+    assert response.status_code == 401
+
+
+def test_admin_endpoints_need_a_login(client, store):
+    trip_id = store.list()["trip_id"].iloc[0]
+    assert client.get("/admin/trips").status_code == 401
+    assert client.get(f"/admin/trips/{trip_id}").status_code == 401
+    assert client.get("/admin/trips", headers={"Authorization": "Bearer made-up"}).status_code == 401
+
+
+def test_trip_list_has_every_trip_with_scores(client, store):
+    trips = client.get("/admin/trips", headers=login(client)).json()["trips"]
+    assert len(trips) == len(store.list()) == 36
+    first = trips[0]
+    assert {"trip_id", "driver", "start", "distance_km", "phone", "scored", "why", "driving_score", "conditions_score", "old_score"} <= set(first)
+    assert all(t["scored"] and 0 <= t["driving_score"] <= 100 for t in trips)
+
+
+def test_unscored_trip_is_listed_with_the_reason(client, store):
+    from tests.conftest import add_tagged_trip
+    add_tagged_trip(store, "shorty", "residential", 0.8, 0, 99, "calm")
+    trips = {t["driver"]: t for t in client.get("/admin/trips", headers=login(client)).json()["trips"]}
+    assert not trips["shorty"]["scored"] and trips["shorty"]["driving_score"] is None
+    assert "less than 1 km" in trips["shorty"]["why"]
+
+
+def test_trip_detail_has_score_reasons_and_route(client, store):
+    trip_id = store.list()["trip_id"].iloc[0]
+    trip = client.get(f"/admin/trips/{trip_id}", headers=login(client)).json()
+    assert trip["scored"] and len(trip["score"]["moments"]) == 3
+    assert len(trip["reasons"]["driving_reasons"]) == 3
+    assert 2 <= len(trip["route"]) <= 300 and all(len(p) == 2 for p in trip["route"])
+
+
+def test_unknown_trip_detail_is_a_404(client):
+    assert client.get("/admin/trips/nobody-20260101T000000Z", headers=login(client)).status_code == 404
