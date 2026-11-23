@@ -24,7 +24,7 @@ from pydantic import BaseModel
 
 from fairdrive.admins import AdminAccounts
 from fairdrive.features import is_tagged
-from fairdrive.model import model_dir
+from fairdrive.model import NotEnoughTrips, model_dir
 from fairdrive.scoring import score_trips
 from fairdrive.sensorlogger import RecordingError
 from fairdrive.store import TripStore
@@ -163,6 +163,8 @@ def _why_not_scored(details: dict) -> str:
         return details["flag"]
     if not is_tagged(details):
         return "it still needs road, time and weather (run `fairdrive tag`)"
+    if _scores().empty:
+        return "FairDrive needs tagged trips from at least 2 drivers before it can score any"
     return "less than 1 km is left once 500 m is hidden at each end. Drive at least 3 km"
 
 
@@ -172,5 +174,8 @@ def _scores() -> pd.DataFrame:
     key = tuple((f.name, f.stat().st_mtime_ns) for f in files)
     if key not in _cache:
         _cache.clear()
-        _cache[key] = score_trips(store)
+        try:
+            _cache[key] = score_trips(store)
+        except NotEnoughTrips:
+            _cache[key] = pd.DataFrame(columns=["trip_id"])
     return _cache[key]

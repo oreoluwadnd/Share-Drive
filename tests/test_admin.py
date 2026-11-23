@@ -98,3 +98,36 @@ def test_trip_detail_has_score_reasons_and_route(client, store):
 
 def test_unknown_trip_detail_is_a_404(client):
     assert client.get("/admin/trips/nobody-20260101T000000Z", headers=login(client)).status_code == 404
+
+
+# Before the model can run: no trips at all, or tagged trips from only one driver.
+
+@pytest.fixture
+def lonely_client(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from fairdrive import api
+    from fairdrive.store import TripStore
+    store = TripStore(tmp_path / "data")
+    monkeypatch.setattr(api, "store", store)
+    monkeypatch.setattr(api, "admins", AdminAccounts(store.root / "admins.json"))
+    api._cache.clear()
+    api._sessions.clear()
+    api.admins.add("ana@example.com", PASSWORD)
+    return TestClient(api.app), store
+
+
+def test_trip_list_is_empty_before_any_trips(lonely_client):
+    client, _ = lonely_client
+    response = client.get("/admin/trips", headers=login(client))
+    assert response.status_code == 200 and response.json()["trips"] == []
+
+
+def test_one_drivers_trips_are_listed_as_waiting_for_a_second_driver(lonely_client):
+    from tests.conftest import add_tagged_trip
+    client, store = lonely_client
+    trip_id = add_tagged_trip(store, "ana", "residential", 5, 1.0, 1, "normal")
+    trips = client.get("/admin/trips", headers=login(client)).json()["trips"]
+    assert [t["scored"] for t in trips] == [False]
+    assert "at least 2 drivers" in trips[0]["why"]
+    assert client.get(f"/admin/trips/{trip_id}", headers=login(client)).json()["scored"] is False
+    assert "at least 2 drivers" in client.get(f"/trips/{trip_id}/score").json()["detail"]
