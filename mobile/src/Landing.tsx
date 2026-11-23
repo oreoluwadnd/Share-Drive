@@ -1,11 +1,12 @@
 // The web front page. Layout after Mobbin references: Superpower and Jeton (hero with a phone),
 // Hims (statement), Norma (how it works), Legora and SpaceXAI (big numbers), Amperos (dark card).
 // Every number comes from docs/fairness-audit.md (UAH-DriveSet, 6 drivers, 37 scored trips).
+// The two photos in assets/landing were generated with Gemini.
 
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ComponentRef, createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, Image, ImageBackground, LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { Moment } from './fairdrive';
 import { DrivingRoad, ScoreRing } from './motion';
@@ -157,10 +158,10 @@ function HowItWorks({ wide }: { wide: boolean }) {
     <Reveal anchor="how" style={[s.frame, s.section]}>
       <SectionHead kicker="How it works" title="From your drive to a fair score" lead="No extra hardware. Just a phone in a mount." />
       <View style={[s.cards, wide && s.cardsWide]}>
-        <StepCard number={1} title="Drive with your phone" text="Mount your phone, tap Start and drive. It records how the car moves, and where.">
-          <View style={s.stepRoad}><DrivingRoad kmh={50} /></View>
+        <StepCard number={1} wide={wide} title="Drive with your phone" text="Mount your phone, tap Start and drive. It records how the car moves, and where.">
+          <Image source={require('../assets/landing/phone-mount.jpg')} style={s.stepPhoto} resizeMode="cover" accessibilityLabel="A phone in a dashboard mount, on a tree-lined street" />
         </StepCard>
-        <StepCard number={2} title="We read the conditions" text="FairDrive looks up the road types, speed limits, daylight and weather along your route.">
+        <StepCard number={2} wide={wide} title="We read the conditions" text="FairDrive looks up the road types, speed limits, daylight and weather along your route.">
           <View style={s.conditionGrid}>
             <Condition icon="road-variant" label="Main road" />
             <Condition icon="car-speed-limiter" label="50 km/h" />
@@ -168,7 +169,7 @@ function HowItWorks({ wide }: { wide: boolean }) {
             <Condition icon="weather-rainy" label="Light rain" />
           </View>
         </StepCard>
-        <StepCard number={3} title="You get a fair score" text="Each harsh moment is compared with what's normal on those roads, with a reason you can act on.">
+        <StepCard number={3} wide={wide} title="You get a fair score" text="Each harsh moment is compared with what's normal on those roads, with a reason you can act on.">
           <View style={s.stepMoments}>
             {SAMPLE_MOMENTS.slice(0, 2).map((moment, i) => <MomentRow key={moment.kind} moment={moment} first={i === 0} />)}
           </View>
@@ -240,13 +241,18 @@ function Privacy({ wide }: { wide: boolean }) {
 function FinalCall({ onHow, onAdmin }: { onHow: () => void; onAdmin: () => void }) {
   return (
     <Reveal style={[s.frame, s.final]}>
-      <View style={s.finalRoad}><DrivingRoad kmh={80} /></View>
-      <Text style={[s.h2, ui.centerText]}>Drive. Stop. See your fair score.</Text>
-      <Text style={[ui.lead, ui.centerText, s.finalLead]}>Your score arrives on your phone a moment after you park, with three plain reasons behind it.</Text>
-      <View style={[s.buttonRow, s.centerRow]}>
-        <Button label="See how it works" icon="arrow-up" onPress={onHow} />
-        <Button label="Admin login" icon="lock-outline" secondary onPress={onAdmin} />
-      </View>
+      <ImageBackground source={require('../assets/landing/highway-dusk.jpg')} style={s.finalCard} imageStyle={s.finalImage} accessibilityLabel="An empty highway at dusk">
+        <LinearGradient colors={['rgba(9,12,20,0.62)', 'rgba(9,12,20,0.28)', 'rgba(9,12,20,0.7)']} style={StyleSheet.absoluteFill} />
+        <View style={s.finalText}>
+          <Text style={[s.h2, s.finalTitle]}>Drive. Stop. See your fair score.</Text>
+          <Text style={s.finalLead}>Your score arrives on your phone a moment after you park, with three plain reasons behind it.</Text>
+          <View style={[s.buttonRow, s.centerRow]}>
+            <Button label="See how it works" icon="arrow-up" light onPress={onHow} />
+            <Button label="Admin login" icon="lock-outline" glass onPress={onAdmin} />
+          </View>
+        </View>
+        <View style={s.finalRoad}><DrivingRoad kmh={80} /></View>
+      </ImageBackground>
     </Reveal>
   );
 }
@@ -272,13 +278,15 @@ const Logo = () => (
   </View>
 );
 
-function Button({ label, icon, onPress, secondary, small }: { label: string; icon: IconName; onPress: () => void; secondary?: boolean; small?: boolean }) {
+function Button(p: { label: string; icon: IconName; onPress: () => void; secondary?: boolean; small?: boolean; light?: boolean; glass?: boolean }) {
+  const darkText = p.secondary || p.light;
   return (
-    <Pressable onPress={onPress} style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
-      s.button, secondary && s.buttonSecondary, small && s.buttonSmall, hovered && s.buttonHover, pressed && ui.pressed,
+    <Pressable onPress={p.onPress} style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
+      s.button, p.secondary && s.buttonSecondary, p.light && s.buttonLight, p.glass && s.buttonGlass, p.small && s.buttonSmall,
+      hovered && s.buttonHover, pressed && ui.pressed,
     ]}>
-      <Text style={[s.buttonText, secondary && s.buttonTextSecondary, small && s.buttonTextSmall]}>{label}</Text>
-      <MaterialCommunityIcons name={icon} size={small ? 15 : 18} color={secondary ? T.text : '#FFFFFF'} />
+      <Text style={[s.buttonText, darkText && s.buttonTextSecondary, p.small && s.buttonTextSmall]}>{p.label}</Text>
+      <MaterialCommunityIcons name={p.icon} size={p.small ? 15 : 18} color={darkText ? T.text : '#FFFFFF'} />
     </Pressable>
   );
 }
@@ -308,8 +316,8 @@ const SectionHead = ({ kicker, title, lead }: { kicker: string; title: string; l
   </View>
 );
 
-const StepCard = ({ number, title, text, children }: { number: number; title: string; text: string; children: ReactNode }) => (
-  <View style={[ui.card, s.step]}>
+const StepCard = ({ number, title, text, wide, children }: { number: number; title: string; text: string; wide: boolean; children: ReactNode }) => (
+  <View style={[ui.card, s.step, wide && s.stepWide]}>
     <View style={s.stepNumber}><Text style={s.stepNumberText}>{number}</Text></View>
     <Text style={s.cardTitle}>{title}</Text>
     <Text style={ui.muted}>{text}</Text>
@@ -476,6 +484,8 @@ const s = StyleSheet.create({
 
   button: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: T.text, borderRadius: 999, paddingHorizontal: 24, paddingVertical: 16 },
   buttonSecondary: { backgroundColor: T.card, ...T.cardShadow },
+  buttonLight: { backgroundColor: '#FFFFFF' },
+  buttonGlass: { backgroundColor: 'rgba(255,255,255,0.14)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
   buttonSmall: { paddingHorizontal: 16, paddingVertical: 10 },
   buttonHover: { transform: [{ translateY: -1 }], opacity: 0.92 },
   buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
@@ -513,11 +523,12 @@ const s = StyleSheet.create({
   cardsWide: { flexDirection: 'row' },
   cardTitle: { color: T.text, fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
 
-  step: { flex: 1, padding: 24, gap: 10 },
+  step: { padding: 24, gap: 10 },
+  stepWide: { flex: 1 },
   stepNumber: { width: 32, height: 32, borderRadius: 16, borderWidth: 1.5, borderColor: T.track, alignItems: 'center', justifyContent: 'center' },
   stepNumberText: { color: T.text, fontSize: 14, fontWeight: '800' },
   stepVisual: { marginTop: 10, minHeight: 130, justifyContent: 'center' },
-  stepRoad: { transform: [{ scale: 0.92 }] },
+  stepPhoto: { width: '100%', height: 240, borderRadius: 20 },
   stepMoments: { backgroundColor: T.background[0], borderRadius: 20, paddingHorizontal: 14 },
   conditionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   condition: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: T.background[0], borderRadius: 14, paddingHorizontal: 12, paddingVertical: 11, flexGrow: 1, flexBasis: 130 },
@@ -558,9 +569,13 @@ const s = StyleSheet.create({
   darkPointTitle: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
   darkPointText: { color: 'rgba(255,255,255,0.68)', fontSize: 15, lineHeight: 22, marginTop: 3 },
 
-  final: { paddingTop: 72, paddingBottom: 56, alignItems: 'center', gap: 16 },
-  finalRoad: { width: '100%', maxWidth: 560, marginBottom: 16 },
-  finalLead: { maxWidth: 560 },
+  final: { paddingTop: 72, paddingBottom: 56 },
+  finalCard: { borderRadius: 36, overflow: 'hidden', minHeight: 540, justifyContent: 'space-between', paddingTop: 72, paddingHorizontal: 24 },
+  finalImage: { borderRadius: 36 },
+  finalText: { alignItems: 'center', gap: 16 },
+  finalTitle: { color: '#FFFFFF', textAlign: 'center' },
+  finalLead: { color: 'rgba(255,255,255,0.85)', fontSize: 18, lineHeight: 27, textAlign: 'center', maxWidth: 560 },
+  finalRoad: { width: '100%', maxWidth: 620, alignSelf: 'center', marginTop: 48, marginBottom: -28 },
 
   footer: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingVertical: 32, borderTopWidth: 1, borderTopColor: T.track },
   footerLink: { color: T.text, fontSize: 15, fontWeight: '700' },
