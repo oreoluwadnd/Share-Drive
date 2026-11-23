@@ -55,7 +55,7 @@ export function ScoredTrip({ score, reasons }: { score: Score; reasons: TripReas
 
 const MOMENT_ICONS: Record<string, IconName> = { hard_brake: 'car-brake-alert', hard_accel: 'speedometer', hard_corner: 'steering' };
 
-function MomentRow({ moment, first }: { moment: Moment; first: boolean }) {
+export function MomentRow({ moment, first }: { moment: Moment; first: boolean }) {
   const over = moment.count > moment.normal + 0.5;
   const colors = over ? T.ring.fair : T.ring.good;
   const scale = Math.max(moment.count, moment.normal * 2, 1);

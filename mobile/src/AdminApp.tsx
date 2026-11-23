@@ -15,17 +15,17 @@ import { Chip, drivingTier, Field, IconName, PrimaryButton, ui } from './ui';
 
 const WIDE = 900;
 
-export default function AdminApp() {
+export default function AdminApp({ onHome }: { onHome: () => void }) {
   const [session, setSession] = useState<Session | null>(null);
   const [openTrip, setOpenTrip] = useState<string | null>(null);
   const logOut = () => { setSession(null); setOpenTrip(null); };
 
   return (
     <LinearGradient colors={T.background} style={s.root}>
-      {!session ? <Login onLogin={setSession} /> : (
+      {!session ? <Login onLogin={setSession} onHome={onHome} /> : (
         <ScrollView contentContainerStyle={s.scroll}>
           <View style={s.frame}>
-            <TopBar email={session.email} onLogOut={logOut} />
+            <TopBar email={session.email} onLogOut={logOut} onHome={onHome} />
             {openTrip
               ? <TripPage session={session} tripId={openTrip} onBack={() => setOpenTrip(null)} onLoggedOut={logOut} />
               : <TripsPage session={session} onOpen={setOpenTrip} onLoggedOut={logOut} />}
@@ -36,7 +36,7 @@ export default function AdminApp() {
   );
 }
 
-function Login({ onLogin }: { onLogin: (session: Session) => void }) {
+function Login({ onLogin, onHome }: { onLogin: (session: Session) => void; onHome: () => void }) {
   const [server, setServer] = useState('localhost:8000');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -59,6 +59,10 @@ function Login({ onLogin }: { onLogin: (session: Session) => void }) {
   return (
     <ScrollView contentContainerStyle={[ui.page, s.loginPage]}>
       <View style={s.loginBox}>
+        <Pressable onPress={onHome} style={({ pressed }) => [s.back, pressed && ui.pressed]}>
+          <MaterialCommunityIcons name="arrow-left" size={18} color={T.text} />
+          <Text style={s.ghostText}>Back to FairDrive</Text>
+        </Pressable>
         <View style={s.brandRow}>
           <Text style={s.brand}>FairDrive</Text>
           <View style={s.adminPill}><Text style={s.adminPillText}>Admin</Text></View>
@@ -81,13 +85,13 @@ function Login({ onLogin }: { onLogin: (session: Session) => void }) {
   );
 }
 
-function TopBar({ email, onLogOut }: { email: string; onLogOut: () => void }) {
+function TopBar({ email, onLogOut, onHome }: { email: string; onLogOut: () => void; onHome: () => void }) {
   return (
     <View style={s.topBar}>
-      <View style={s.brandRow}>
+      <Pressable onPress={onHome} style={s.brandRow}>
         <Text style={s.brand}>FairDrive</Text>
         <View style={s.adminPill}><Text style={s.adminPillText}>Admin</Text></View>
-      </View>
+      </Pressable>
       <View style={s.topRight}>
         <Text style={ui.muted}>{email}</Text>
         <Pressable onPress={onLogOut} style={({ pressed }) => [s.ghostButton, pressed && ui.pressed]}>

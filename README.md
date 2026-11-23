@@ -79,7 +79,7 @@ curl localhost:8000/trips/<trip_id>/explain                         # three reas
 
 A file that can't be used gets a 400 that names the problem.
 
-The admin web dashboard (every trip, with scores, reasons and route) is the same Expo app opened in a browser; see `mobile/README.md`.
+The landing page and the admin web dashboard (every trip, with scores, reasons and route) are the same Expo app opened in a browser; see `mobile/README.md`.
 
 ## Recording a drive
 

@@ -3,7 +3,7 @@
 One Expo app, two faces:
 
 - **On a phone:** the driver app. Records a drive (motion 50 times a second, GPS once a second), sends it to the FairDrive API on a laptop, and shows both scores with their reasons. Recordings use Sensor Logger's JSON format, so FairDrive reads them unchanged.
-- **In a browser:** the admin dashboard. Admins log in and see every trip, with scores, reasons and the route.
+- **In a browser:** the FairDrive landing page, and behind **Admin login** the admin dashboard, where admins see every trip with scores, reasons and the route.
 
 ## Run it
 
