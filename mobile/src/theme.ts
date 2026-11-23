@@ -11,6 +11,7 @@ export const T = {
   primary: '#0F1115',
   onPrimary: '#FFFFFF',
   record: '#FF3B30',
+  tabBar: { backgroundColor: '#FFFFFF', borderTopColor: '#EDEFF3', height: 84, paddingTop: 8 },
   ring: {
     good: ['#22C55E', '#10B9A8'] as const,
     fair: ['#F59E0B', '#F97316'] as const,

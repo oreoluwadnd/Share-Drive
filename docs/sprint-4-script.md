@@ -8,7 +8,7 @@ Six parts, about 40 seconds each. With fewer than six people, give someone two p
 
 ## Person 2: The phone app
 
-"We built a FairDrive phone app. You type your name, tap Start, and drive. A car on the screen drives along a road that moves with your speed. When you stop, the app sends the drive to FairDrive and shows your score in a ring that fills up, plus a one-line tip like 'Watch your braking', and a breakdown of hard braking, sharp speeding up and sharp turns, each compared with what's normal. We based the design on real apps like Oura and State Farm's Drive Safe and Save."
+"We built a FairDrive phone app. You create an account, tap Start, and drive. A car on the screen drives along a road that moves with your speed. When you stop, the app sends the drive to FairDrive and shows your score in a ring that fills up, plus a one-line tip like 'Watch your braking', and a breakdown of hard braking, sharp speeding up and sharp turns, each compared with what's normal. We based the design on real apps like Oura and State Farm's Drive Safe and Save."
 
 ## Person 3: Is the score fair?
 

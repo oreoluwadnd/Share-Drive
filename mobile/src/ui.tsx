@@ -8,22 +8,31 @@ import { T } from './theme';
 
 export type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
-export const PrimaryButton = ({ label, disabled, onPress }: { label: string; disabled?: boolean; onPress: () => void }) => (
-  <Pressable disabled={disabled} onPress={onPress} style={({ pressed }) => [ui.primary, disabled && ui.disabled, pressed && ui.pressed]}>
+export const PrimaryButton = ({ label, disabled, danger, onPress }: { label: string; disabled?: boolean; danger?: boolean; onPress: () => void }) => (
+  <Pressable disabled={disabled} onPress={onPress} style={({ pressed }) => [ui.primary, danger && ui.danger, disabled && ui.disabled, pressed && ui.pressed]}>
     <Text style={ui.primaryText}>{label}</Text>
+  </Pressable>
+);
+
+export const SecondaryButton = ({ label, icon, onPress }: { label: string; icon?: IconName; onPress: () => void }) => (
+  <Pressable onPress={onPress} style={({ pressed }) => [ui.card, ui.secondary, pressed && ui.pressed]}>
+    {icon && <MaterialCommunityIcons name={icon} size={18} color={T.text} />}
+    <Text style={ui.secondaryText}>{label}</Text>
   </Pressable>
 );
 
 export function Field(p: {
   label: string; value: string; onChange: (t: string) => void; placeholder: string;
   keyboard?: 'url' | 'email-address'; secret?: boolean; onSubmit?: () => void;
+  autoComplete?: 'name' | 'email' | 'current-password' | 'new-password';
 }) {
   return (
     <View style={ui.field}>
       <Text style={ui.label}>{p.label}</Text>
       <TextInput
         style={ui.input} value={p.value} onChangeText={p.onChange} placeholder={p.placeholder} placeholderTextColor={T.faint}
-        autoCapitalize="none" autoCorrect={false} keyboardType={p.keyboard ?? 'default'} secureTextEntry={p.secret}
+        autoCapitalize={p.autoComplete === 'name' ? 'words' : 'none'} autoCorrect={false} keyboardType={p.keyboard ?? 'default'}
+        secureTextEntry={p.secret} autoComplete={p.autoComplete}
         onSubmitEditing={p.onSubmit}
       />
     </View>
@@ -83,7 +92,12 @@ export const ui = StyleSheet.create({
   chipText: { color: T.text, fontSize: 13, fontWeight: '600' },
   primary: { backgroundColor: T.primary, borderRadius: 999, paddingVertical: 18, alignItems: 'center', marginTop: 4 },
   primaryText: { color: T.onPrimary, fontSize: 17, fontWeight: '700' },
+  danger: { backgroundColor: T.record },
+  secondary: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, paddingVertical: 16 },
+  secondaryText: { color: T.text, fontSize: 16, fontWeight: '700' },
   disabled: { opacity: 0.35 },
   pressed: { opacity: 0.8, transform: [{ scale: 0.98 }] },
   error: { color: T.ring.poor[1], fontSize: 15, fontWeight: '600' },
+  link: { color: T.text, fontSize: 15, fontWeight: '700', textDecorationLine: 'underline' },
+  row: { flexDirection: 'row' },
 });
