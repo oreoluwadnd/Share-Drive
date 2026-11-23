@@ -2,22 +2,17 @@
 
 import pytest
 
-from fairdrive.admins import AdminAccounts
+from fairdrive.accounts import Accounts
 from fairdrive.cli import main
-
-PASSWORD = "correct horse battery"
+from tests.conftest import PASSWORD, sign_up
 
 
 @pytest.fixture
-def client(store, monkeypatch):
-    from fastapi.testclient import TestClient
+def client(store, make_client):
     from fairdrive import api
-    monkeypatch.setattr(api, "store", store)
-    monkeypatch.setattr(api, "admins", AdminAccounts(store.root / "admins.json"))
-    api._cache.clear()
-    api._sessions.clear()
+    client = make_client(store)
     api.admins.add("ana@example.com", PASSWORD)
-    return TestClient(api.app)
+    return client
 
 
 def login(client) -> dict:
@@ -28,7 +23,7 @@ def login(client) -> dict:
 # Accounts
 
 def test_password_is_stored_hashed_and_checked(tmp_path):
-    accounts = AdminAccounts(tmp_path / "admins.json")
+    accounts = Accounts(tmp_path / "admins.json")
     accounts.add("Ana@Example.com", PASSWORD)
     assert PASSWORD not in (tmp_path / "admins.json").read_text()
     assert accounts.check("ana@example.com", PASSWORD)  # email case doesn't matter
@@ -37,7 +32,7 @@ def test_password_is_stored_hashed_and_checked(tmp_path):
 
 
 def test_duplicate_admin_and_short_password_are_refused(tmp_path):
-    accounts = AdminAccounts(tmp_path / "admins.json")
+    accounts = Accounts(tmp_path / "admins.json")
     accounts.add("ana@example.com", PASSWORD)
     with pytest.raises(ValueError, match="already"):
         accounts.add("ana@example.com", PASSWORD)
@@ -48,7 +43,7 @@ def test_duplicate_admin_and_short_password_are_refused(tmp_path):
 def test_cli_adds_an_admin(tmp_path, monkeypatch):
     monkeypatch.setattr("fairdrive.cli.getpass", lambda prompt: PASSWORD)
     main(["--data-dir", str(tmp_path), "add-admin", "ben@example.com"])
-    assert AdminAccounts(tmp_path / "admins.json").check("ben@example.com", PASSWORD)
+    assert Accounts(tmp_path / "admins.json").check("ben@example.com", PASSWORD)
 
 
 def test_cli_refuses_passwords_that_dont_match(tmp_path, monkeypatch):
@@ -76,7 +71,8 @@ def test_trip_list_has_every_trip_with_scores(client, store):
     trips = client.get("/admin/trips", headers=login(client)).json()["trips"]
     assert len(trips) == len(store.list()) == 36
     first = trips[0]
-    assert {"trip_id", "driver", "start", "distance_km", "phone", "scored", "why", "driving_score", "conditions_score", "old_score"} <= set(first)
+    assert {"trip_id", "driver", "driver_name", "start", "distance_km", "phone", "scored", "why", "driving_score",
+            "conditions_score", "old_score", "moments"} <= set(first)
     assert all(t["scored"] and 0 <= t["driving_score"] <= 100 for t in trips)
 
 
@@ -96,6 +92,22 @@ def test_trip_detail_has_score_reasons_and_route(client, store):
     assert 2 <= len(trip["route"]) <= 300 and all(len(p) == 2 for p in trip["route"])
 
 
+def test_trip_list_names_drivers_with_accounts(client, store):
+    from tests.conftest import add_tagged_trip
+    ana = sign_up(client, "Ana")
+    add_tagged_trip(store, ana["driver"]["driver_id"], "residential", 5, 1.0, 98, "normal")
+    trips = client.get("/admin/trips", headers=login(client)).json()["trips"]
+    names = {t["driver"]: t["driver_name"] for t in trips}
+    assert names[ana["driver"]["driver_id"]] == "Ana"
+    assert names["driver0"] == "driver0"  # no account: the stored id is shown
+    anas = next(t["trip_id"] for t in trips if t["driver_name"] == "Ana")
+    assert client.get(f"/admin/trips/{anas}", headers=login(client)).json()["driver_name"] == "Ana"
+
+
+def test_a_driver_token_is_not_an_admin_token(client):
+    assert client.get("/admin/trips", headers=sign_up(client, "Ana")["headers"]).status_code == 401
+
+
 def test_unknown_trip_detail_is_a_404(client):
     assert client.get("/admin/trips/nobody-20260101T000000Z", headers=login(client)).status_code == 404
 
@@ -103,17 +115,13 @@ def test_unknown_trip_detail_is_a_404(client):
 # Before the model can run: no trips at all, or tagged trips from only one driver.
 
 @pytest.fixture
-def lonely_client(tmp_path, monkeypatch):
-    from fastapi.testclient import TestClient
+def lonely_client(tmp_path, make_client):
     from fairdrive import api
     from fairdrive.store import TripStore
     store = TripStore(tmp_path / "data")
-    monkeypatch.setattr(api, "store", store)
-    monkeypatch.setattr(api, "admins", AdminAccounts(store.root / "admins.json"))
-    api._cache.clear()
-    api._sessions.clear()
+    client = make_client(store)
     api.admins.add("ana@example.com", PASSWORD)
-    return TestClient(api.app), store
+    return client, store
 
 
 def test_trip_list_is_empty_before_any_trips(lonely_client):
@@ -130,4 +138,3 @@ def test_one_drivers_trips_are_listed_as_waiting_for_a_second_driver(lonely_clie
     assert [t["scored"] for t in trips] == [False]
     assert "at least 2 drivers" in trips[0]["why"]
     assert client.get(f"/admin/trips/{trip_id}", headers=login(client)).json()["scored"] is False
-    assert "at least 2 drivers" in client.get(f"/trips/{trip_id}/score").json()["detail"]

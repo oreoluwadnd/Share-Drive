@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from fairdrive.admins import AdminAccounts
+from fairdrive.accounts import Accounts
 from fairdrive.baseline import driver_scores
 from fairdrive.braking import study
 from fairdrive.compare import comparison
@@ -124,7 +124,7 @@ def main(argv: list[str] | None = None) -> None:
         if getpass("Same password again: ") != password:
             sys.exit("error: the passwords didn't match. No admin was added.")
         try:
-            AdminAccounts(args.data_dir / "admins.json").add(args.email, password)
+            Accounts(args.data_dir / "admins.json").add(args.email, password)
         except ValueError as error:
             sys.exit(f"error: {error}")
         print(f"Added admin {args.email.strip().lower()}")

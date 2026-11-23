@@ -57,3 +57,39 @@ def store(tmp_path):
 @pytest.fixture
 def scores(store):
     return score_trips(store)
+
+
+PASSWORD = "correct horse battery"
+
+
+@pytest.fixture
+def make_client(monkeypatch):
+    """make_client(store): an API test client on that store, with no accounts or sessions yet."""
+    def make(store):
+        from fastapi.testclient import TestClient
+        from fairdrive import api
+        from fairdrive.accounts import Accounts
+        from fairdrive.sessions import Sessions
+        monkeypatch.setattr(api, "store", store)
+        monkeypatch.setattr(api, "admins", Accounts(store.root / "admins.json"))
+        monkeypatch.setattr(api, "drivers", Accounts(store.root / "drivers.json"))
+        monkeypatch.setattr(api, "sessions", Sessions(store.root / "sessions.json"))
+        api._cache.clear()
+        return TestClient(api.app)
+    return make
+
+
+def sign_up(client, name: str) -> dict:
+    """Signs up a driver called `name` and returns {"headers", "driver"}."""
+    response = client.post("/auth/signup", json={"name": name, "email": f"{name.lower()}@example.com", "password": PASSWORD})
+    assert response.status_code == 201, response.text
+    body = response.json()
+    return {"headers": {"Authorization": f"Bearer {body['token']}"}, "driver": body["driver"]}
+
+
+def admin_headers(client) -> dict:
+    """Adds an admin and returns the headers of a logged-in session."""
+    from fairdrive import api
+    api.admins.add("admin@example.com", PASSWORD)
+    token = client.post("/admin/login", json={"email": "admin@example.com", "password": PASSWORD}).json()["token"]
+    return {"Authorization": f"Bearer {token}"}

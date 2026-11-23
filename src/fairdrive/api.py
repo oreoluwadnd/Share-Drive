@@ -1,55 +1,131 @@
 """Scores through an API (FD-26). Start it with `uv run fairdrive api`.
 
-POST /trips                    upload a Sensor Logger JSON export (form fields: file, driver); adds road, time and weather
-GET  /trips/{trip_id}/score    both scores, the old score, and each kind of harsh moment against what's normal
-GET  /trips/{trip_id}/explain  three plain-language reasons for each score
+Every call except sign up and sign in needs "Authorization: Bearer <token>".
 
-Admin (web dashboard), after logging in with an account made by `fairdrive add-admin`:
-POST /admin/login              {email, password} -> {token}; send it as "Authorization: Bearer <token>"
-GET  /admin/trips              every stored trip, scored or not
-GET  /admin/trips/{trip_id}    one trip: scores, reasons and route
+Drivers (phone app):
+POST   /auth/signup             {name, email, password} -> {token, driver}
+POST   /auth/login              {email, password} -> {token, driver}
+POST   /auth/logout             ends this sign-in
+GET    /me                      the signed-in driver
+DELETE /me                      deletes the driver's account and every trip they uploaded
+POST   /trips                   upload a Sensor Logger JSON export (form field: file); adds road, time and weather
+GET    /me/trips                the driver's trips, newest first, with scores and harsh moments
+GET    /me/trips/{trip_id}      one of the driver's trips: scores, reasons and route
+
+Admins (web dashboard), with an account made by `fairdrive add-admin`:
+POST   /admin/login             {email, password} -> {token, email}
+GET    /admin/trips             every stored trip, scored or not
+GET    /admin/trips/{trip_id}   any trip: scores, reasons and route
 """
 
 import os
 import secrets
 import tempfile
-import time
 import urllib.error
 from pathlib import Path
 
 import pandas as pd
-from fastapi import Depends, FastAPI, Form, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from fairdrive.admins import AdminAccounts
+from fairdrive.accounts import AccountExists, Accounts
 from fairdrive.features import is_tagged
 from fairdrive.model import NotEnoughTrips, model_dir
 from fairdrive.scoring import score_trips
 from fairdrive.sensorlogger import RecordingError
+from fairdrive.sessions import Sessions
 from fairdrive.store import TripStore
 from fairdrive.tagging import tag_all
 from fairdrive.upload import upload
 
 store = TripStore(Path(os.environ.get("FAIRDRIVE_DATA", "data")))
-admins = AdminAccounts(store.root / "admins.json")
+admins = Accounts(store.root / "admins.json")
+drivers = Accounts(store.root / "drivers.json")
+sessions = Sessions(store.root / "sessions.json")
 app = FastAPI(title="FairDrive", description="Driving scores that judge you against what is normal for your roads, time and weather.")
-# The web dashboard is served from another port. Admin calls carry a bearer token, not cookies, so any origin is safe.
+# The web dashboard is served from another port. Calls carry a bearer token, not cookies, so any origin is safe.
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 _cache: dict[tuple, pd.DataFrame] = {}
-SESSION_SECONDS = 12 * 3600
+ADMIN_SESSION_SECONDS = 12 * 3600
+DRIVER_SESSION_SECONDS = 90 * 24 * 3600
 ROUTE_POINTS = 300
-_sessions: dict[str, tuple[str, float]] = {}  # token -> (email, expiry); cleared when the server restarts
 MOMENT_LABELS = {"hard_brake": "Hard braking", "hard_accel": "Sharp speeding up", "hard_corner": "Sharp turns"}
 
 
+# Driver accounts
+
+class SignUp(BaseModel):
+    name: str
+    email: str
+    password: str
+
+
+class Login(BaseModel):
+    email: str
+    password: str
+
+
+@app.post("/auth/signup", status_code=201)
+def sign_up(form: SignUp) -> dict:
+    if not form.name.strip():
+        raise HTTPException(400, "Enter your name")
+    try:
+        driver = drivers.add(form.email, form.password, name=form.name.strip(), driver_id=f"u{secrets.token_hex(4)}")
+    except AccountExists as error:
+        raise HTTPException(409, f"{error}. Sign in instead.")
+    except ValueError as error:
+        raise HTTPException(400, str(error))
+    return {"token": sessions.start("driver", driver["email"], DRIVER_SESSION_SECONDS), "driver": driver}
+
+
+@app.post("/auth/login")
+def sign_in(login: Login) -> dict:
+    driver = drivers.check(login.email, login.password)
+    if driver is None:
+        raise HTTPException(401, "Wrong email or password")
+    return {"token": sessions.start("driver", driver["email"], DRIVER_SESSION_SECONDS), "driver": driver}
+
+
+def _token(authorization: str | None = Header(default=None)) -> str:
+    return (authorization or "").removeprefix("Bearer ").strip()
+
+
+def _driver(token: str = Depends(_token)) -> dict:
+    """The signed-in driver, or a 401."""
+    email = sessions.who(token, "driver")
+    if email is None:
+        raise HTTPException(401, "Sign in first")
+    return drivers.get(email)
+
+
+@app.post("/auth/logout", status_code=204)
+def sign_out(token: str = Depends(_token), _: dict = Depends(_driver)) -> None:
+    sessions.end(token)
+
+
+@app.get("/me")
+def me(driver: dict = Depends(_driver)) -> dict:
+    return driver
+
+
+@app.delete("/me", status_code=204)
+def delete_me(driver: dict = Depends(_driver)) -> None:
+    for trip_id in _trip_ids(driver["driver_id"]):
+        store.delete(trip_id)
+    sessions.end_all("driver", driver["email"])
+    drivers.remove(driver["email"])
+
+
+# Trips
+
 @app.post("/trips", status_code=201)
-def add_trip(file: UploadFile, driver: str = Form()) -> dict:
+def add_trip(file: UploadFile, driver: dict = Depends(_driver)) -> dict:
     with tempfile.TemporaryDirectory() as folder:
         path = Path(folder) / Path(file.filename or "recording.json").name
         path.write_bytes(file.file.read())
         try:
-            trip_ids = upload(path, driver.strip(), store)
+            trip_ids = upload(path, driver["driver_id"], store)
         except RecordingError as error:
             raise HTTPException(400, f"{error}. Nothing was saved.")
         except FileExistsError as error:
@@ -63,62 +139,82 @@ def add_trip(file: UploadFile, driver: str = Form()) -> dict:
     return {"trips": [{"trip_id": t, "distance_km": float(row["distance_km"]), "flag": row["flag"]} for t, row in trips.iterrows()]}
 
 
-@app.get("/trips/{trip_id}/score")
-def score(trip_id: str) -> dict:
-    return _score_body(trip_id, _scored(trip_id))
+@app.get("/me/trips")
+def my_trips(driver: dict = Depends(_driver)) -> dict:
+    scores = _scores().set_index("trip_id")
+    return {"trips": [_trip_row(trip_id, scores) for trip_id in _trip_ids(driver["driver_id"])]}
 
 
-@app.get("/trips/{trip_id}/explain")
-def explain(trip_id: str) -> dict:
-    return {"trip_id": trip_id, **_reasons(_scored(trip_id))}
+@app.get("/me/trips/{trip_id}")
+def my_trip(trip_id: str, driver: dict = Depends(_driver)) -> dict:
+    if trip_id not in _trip_ids(driver["driver_id"]):
+        raise HTTPException(404, f"No trip {trip_id}")
+    return _trip_detail(trip_id)
 
 
-class Login(BaseModel):
-    email: str
-    password: str
-
+# Admins
 
 @app.post("/admin/login")
 def admin_login(login: Login) -> dict:
-    if not admins.check(login.email, login.password):
+    admin = admins.check(login.email, login.password)
+    if admin is None:
         raise HTTPException(401, "Wrong email or password")
-    token = secrets.token_urlsafe(32)
-    _sessions[token] = (login.email.strip().lower(), time.time() + SESSION_SECONDS)
-    return {"token": token, "email": login.email.strip().lower()}
+    return {"token": sessions.start("admin", admin["email"], ADMIN_SESSION_SECONDS), "email": admin["email"]}
 
 
-def _admin(authorization: str | None = Header(default=None)) -> str:
+def _admin(token: str = Depends(_token)) -> str:
     """The logged-in admin's email, or a 401."""
-    token = (authorization or "").removeprefix("Bearer ").strip()
-    email, expiry = _sessions.get(token, ("", 0.0))
-    if time.time() > expiry:
-        _sessions.pop(token, None)
+    email = sessions.who(token, "admin")
+    if email is None:
         raise HTTPException(401, "Log in first")
     return email
 
 
 @app.get("/admin/trips")
 def admin_trips(_: str = Depends(_admin)) -> dict:
+    names = _driver_names()
     scores = _scores().set_index("trip_id")
-    rows = []
-    for trip in store.list().sort_values("start", ascending=False).itertuples():
-        details = store.details(trip.trip_id)
-        scored = trip.trip_id in scores.index
-        row = scores.loc[trip.trip_id] if scored else None
-        rows.append({
-            "trip_id": trip.trip_id, "driver": trip.driver, "start": trip.start, "distance_km": float(trip.distance_km),
-            "phone": details.get("phone"), "scored": scored, "why": None if scored else _why_not_scored(details),
-            "driving_score": float(row["driving_score"]) if scored else None,
-            "conditions_score": float(row["conditions_score"]) if scored else None,
-            "old_score": float(row["baseline_score"]) if scored else None,
-        })
-    return {"trips": rows}
+    rows = [_trip_row(trip_id, scores) for trip_id in _trip_ids()]
+    return {"trips": [row | {"driver_name": names.get(row["driver"], row["driver"])} for row in rows]}
 
 
 @app.get("/admin/trips/{trip_id}")
 def admin_trip(trip_id: str, _: str = Depends(_admin)) -> dict:
     if not store.exists(trip_id):
         raise HTTPException(404, f"No trip {trip_id}")
+    trip = _trip_detail(trip_id)
+    return trip | {"driver_name": _driver_names().get(trip["driver"], trip["driver"])}
+
+
+def _driver_names() -> dict[str, str]:
+    """Driver id -> name, for drivers with an account. Older trips (such as UAH-DriveSet) have none."""
+    return {d["driver_id"]: d["name"] for d in drivers.all()}
+
+
+# Shared
+
+def _trip_ids(driver_id: str | None = None) -> list[str]:
+    """Trip ids, newest first: one driver's, or everyone's."""
+    trips = store.list().sort_values("start", ascending=False)
+    if driver_id is not None:
+        trips = trips[trips["driver"] == driver_id]
+    return trips["trip_id"].tolist()
+
+
+def _trip_row(trip_id: str, scores: pd.DataFrame) -> dict:
+    """scores: _scores() indexed by trip_id."""
+    details = store.details(trip_id)
+    row = {"trip_id": trip_id, "driver": details["driver"], "start": details["start"], "distance_km": details["distance_km"],
+           "phone": details.get("phone")}
+    if trip_id not in scores.index:
+        return row | {"scored": False, "why": _why_not_scored(details), "driving_score": None, "conditions_score": None,
+                      "old_score": None, "moments": None}
+    score = _score_body(trip_id, scores.loc[trip_id])
+    return row | {"scored": True, "why": None, "driving_score": score["driving_score"], "conditions_score": score["conditions_score"],
+                  "old_score": score["old_score"], "moments": score["moments"]}
+
+
+def _trip_detail(trip_id: str) -> dict:
     details = store.details(trip_id)
     scores = _scores().set_index("trip_id")
     trip = {"trip_id": trip_id, "driver": details["driver"], "start": details["start"], "distance_km": details["distance_km"],
@@ -147,15 +243,6 @@ def _route(trip_id: str, details: dict) -> list[list[float]]:
     points = store.points(trip_id)[["lat", "lon"]]
     step = max(1, len(points) // ROUTE_POINTS + 1)
     return points.iloc[::step].round(6).to_numpy().tolist()
-
-
-def _scored(trip_id: str) -> pd.Series:
-    if not store.exists(trip_id):
-        raise HTTPException(404, f"No trip {trip_id}")
-    scores = _scores().set_index("trip_id")
-    if trip_id not in scores.index:
-        raise HTTPException(422, f"Trip {trip_id} is not scored: {_why_not_scored(store.details(trip_id))}")
-    return scores.loc[trip_id]
 
 
 def _why_not_scored(details: dict) -> str:
