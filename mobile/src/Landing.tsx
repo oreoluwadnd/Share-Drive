@@ -1,72 +1,72 @@
-// The web front page. Layout after Mobbin references: Superpower and Jeton (hero with a phone),
-// Hims (statement), Norma (how it works), Legora and SpaceXAI (big numbers), Amperos (dark card).
+// The web front page, in Apple's design language: a translucent bar, centred headlines, blue pill buttons and
+// "Learn more ›" links, big photos, white and #F5F5F7 bands with rounded tiles, and a black results band.
 // Every number comes from docs/fairness-audit.md (UAH-DriveSet, 6 drivers, 37 scored trips).
-// The two photos in assets/landing were generated with Gemini.
+// The photos in assets/landing were generated with Gemini.
 
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ComponentRef, createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, ImageBackground, LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ComponentRef, ReactNode, useRef, useState } from 'react';
+import { Image, ImageSourcePropType, LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, TextStyle, useWindowDimensions, View } from 'react-native';
 
 import { Moment } from './fairdrive';
-import { DrivingRoad, ScoreRing } from './motion';
+import { ScoreRing } from './motion';
+import { PHOTOS } from './photos';
 import { MomentRow } from './score';
 import { T } from './theme';
 import { IconName, ui } from './ui';
 
-const WIDE = 960;
-const GREEN_TEXT = '#15803D'; // the brand green, dark enough to read on white
+const A = {
+  white: '#FFFFFF', grey: '#F5F5F7', text: '#1D1D1F', secondary: '#6E6E73', hairline: '#D2D2D7',
+  blue: '#0071E3', link: '#0066CC', black: '#000000', onBlack: '#F5F5F7', onBlackSecondary: '#86868B',
+};
+const FONT = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif';
+const WIDE = 834;
 const SAMPLE_MOMENTS: Moment[] = [
   { kind: 'hard_brake', label: 'Hard braking', count: 3, normal: 1.2 },
   { kind: 'hard_accel', label: 'Sharp speeding up', count: 1, normal: 1.6 },
   { kind: 'hard_corner', label: 'Sharp turns', count: 2, normal: 2.4 },
 ];
 
-// Sections reveal themselves as they scroll into view, and register where they sit for the nav links.
-const Page = createContext<{ bottom: number; register: (anchor: string, y: number) => void }>({ bottom: 0, register: () => {} });
-
 export default function Landing({ onAdmin }: { onAdmin: () => void }) {
-  const { width, height } = useWindowDimensions();
-  const wide = width >= WIDE;
+  const wide = useWindowDimensions().width >= WIDE;
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
   const anchors = useRef<Record<string, number>>({});
-  const [scrollY, setScrollY] = useState(0);
-  const goTo = (anchor: string) => scroll.current?.scrollTo({ y: Math.max(0, anchors.current[anchor] - 96), animated: true });
+  const mark = (anchor: string) => (e: LayoutChangeEvent) => { anchors.current[anchor] = e.nativeEvent.layout.y; };
+  const goTo = (anchor: string) => scroll.current?.scrollTo({ y: Math.max(0, anchors.current[anchor] - 48), animated: true });
 
   return (
     <View style={s.root}>
-      <ScrollView ref={scroll} onScroll={(e) => setScrollY(e.nativeEvent.contentOffset.y)} scrollEventThrottle={32}>
-        <Page.Provider value={{ bottom: scrollY + height, register: (anchor, y) => { anchors.current[anchor] = y; } }}>
-          <Hero wide={wide} onHow={() => goTo('how')} onAdmin={onAdmin} />
-          <Statement wide={wide} />
-          <HowItWorks wide={wide} />
-          <TwoScores wide={wide} />
-          <Proof wide={wide} />
-          <Privacy wide={wide} />
-          <FinalCall onHow={() => goTo('how')} onAdmin={onAdmin} />
-          <Footer onAdmin={onAdmin} />
-        </Page.Provider>
+      <ScrollView ref={scroll} stickyHeaderIndices={[0]}>
+        <Nav wide={wide} goTo={goTo} onAdmin={onAdmin} />
+        <Hero wide={wide} onHow={() => goTo('how')} onAdmin={onAdmin} />
+        <View onLayout={mark('roads')}><Roads wide={wide} /></View>
+        <View onLayout={mark('how')}><HowItWorks wide={wide} /></View>
+        <TheApp wide={wide} />
+        <View onLayout={mark('scores')}><TwoScores wide={wide} /></View>
+        <View onLayout={mark('results')}><Results wide={wide} /></View>
+        <View onLayout={mark('privacy')}><Privacy wide={wide} /></View>
+        <FinalCall wide={wide} onHow={() => goTo('how')} onAdmin={onAdmin} />
+        <Footer onAdmin={onAdmin} />
       </ScrollView>
-      <Nav wide={wide} goTo={goTo} onAdmin={onAdmin} raised={scrollY > 24} />
     </View>
   );
 }
 
-function Nav({ wide, goTo, onAdmin, raised }: { wide: boolean; goTo: (a: string) => void; onAdmin: () => void; raised: boolean }) {
+function Nav({ wide, goTo, onAdmin }: { wide: boolean; goTo: (anchor: string) => void; onAdmin: () => void }) {
   return (
-    <View style={s.navWrap} pointerEvents="box-none">
-      <View style={[s.nav, raised && s.navRaised]}>
-        <Logo />
+    <View style={s.nav}>
+      <View style={[s.content, s.navRow]}>
+        <Text style={s.wordmark}>FairDrive</Text>
         {wide && (
           <View style={s.navLinks}>
-            {[['How it works', 'how'], ['Two scores', 'scores'], ['Results', 'proof'], ['Privacy', 'privacy']].map(([label, anchor]) => (
-              <Pressable key={anchor} onPress={() => goTo(anchor)} style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [s.navLinkBox, hovered && s.navLinkHover]}>
-                <Text style={s.navLink}>{label}</Text>
+            {[['How it works', 'how'], ['Two scores', 'scores'], ['Results', 'results'], ['Privacy', 'privacy']].map(([label, anchor]) => (
+              <Pressable key={anchor} onPress={() => goTo(anchor)}>
+                {({ hovered }: { pressed: boolean; hovered?: boolean }) => <Text style={[s.navLink, hovered && s.navLinkHover]}>{label}</Text>}
               </Pressable>
             ))}
           </View>
         )}
-        <Button label="Admin login" icon="lock-outline" small onPress={onAdmin} />
+        <Pill label="Admin login" small onPress={onAdmin} />
       </View>
     </View>
   );
@@ -74,40 +74,87 @@ function Nav({ wide, goTo, onAdmin, raised }: { wide: boolean; goTo: (a: string)
 
 function Hero({ wide, onHow, onAdmin }: { wide: boolean; onHow: () => void; onAdmin: () => void }) {
   return (
-    <View style={s.hero}>
-      <View style={[s.glow, s.glowGreen]} />
-      <View style={[s.glow, s.glowTeal]} />
-      <View style={[s.frame, wide ? s.heroWide : s.heroNarrow]}>
-        <SlideUp delay={0} style={wide ? s.heroText : undefined}>
-          <View style={s.eyebrow}>
-            <View style={s.eyebrowDot} />
-            <Text style={s.eyebrowText}>Driving scores that are fair to everyone</Text>
+    <View style={[s.band, s.heroBand]}>
+      <View style={[s.content, s.centered, s.heroText]}>
+        <Text style={s.eyebrow}>FairDrive</Text>
+        <Text style={[s.h1, !wide && s.h1Narrow]}>Scored on your driving.{'\n'}Not on your roads.</Text>
+        <Text style={[s.lead, s.centerText]}>
+          Busy streets need more braking than an open highway. FairDrive compares every trip with what's normal for its roads, light and weather.
+        </Text>
+        <View style={s.actions}>
+          <Pill label="See how it works" onPress={onHow} />
+          <More label="Admin login" onPress={onAdmin} />
+        </View>
+      </View>
+      {/* Cropped wider than the file on big screens (less sky), and taller on phones (a bigger car). */}
+      <Photo source={PHOTOS.road} ratio={wide ? 2.2 : 1.1} maxWidth={1440} label="A small silver car driving down a country road through autumn trees" />
+    </View>
+  );
+}
+
+function Roads({ wide }: { wide: boolean }) {
+  return (
+    <View style={[s.band, s.grey]}>
+      <View style={s.content}>
+        <Text style={[s.statement, !wide && s.statementNarrow]}>
+          A trip through town needs more braking than a drive on the 401.{' '}
+          <Text style={s.statementGrey}>Old scores call that bad driving. FairDrive calls it normal.</Text>
+        </Text>
+        <View style={[s.tiles, wide && s.row]}>
+          <Tile wide={wide} eyebrow="Downtown at rush hour" title="Lots of braking is normal here." text="Stop-and-go traffic, lights and crossings. FairDrive expects it, so it doesn't count against you.">
+            <Photo source={PHOTOS.city} ratio={1200 / 896} radius={18} label="Brake lights in city traffic at dusk, seen from the driver's seat" />
+          </Tile>
+          <Tile wide={wide} eyebrow="Open highway" title="Hardly any braking is normal here." text="A hard brake on a quiet highway stands out more, so it counts for more.">
+            <Photo source={PHOTOS.highway} ratio={1200 / 896} radius={18} label="A wide, nearly empty highway under a blue sky" />
+          </Tile>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function HowItWorks({ wide }: { wide: boolean }) {
+  return (
+    <View style={s.band}>
+      <View style={s.content}>
+        <Heading title="How it works." rest="From your drive to a fair score, with just a phone." />
+        <View style={[s.tiles, wide && s.row]}>
+          <Tile wide={wide} grey eyebrow="Step 1" title="Mount your phone. Tap Start." text="It records how the car brakes, speeds up and turns, and where.">
+            <Photo source={PHOTOS.mount} ratio={1600 / 1195} radius={18} label="A phone in a dashboard mount, on a tree-lined street" />
+          </Tile>
+          <Tile wide={wide} grey eyebrow="Step 2" title="FairDrive reads the conditions." text="Road types, speed limits, daylight and weather along your route.">
+            <View style={s.conditions}>
+              <Condition icon="road-variant" label="Main road" />
+              <Condition icon="car-speed-limiter" label="50 km/h limit" />
+              <Condition icon="weather-night" label="After dark" />
+              <Condition icon="weather-rainy" label="Light rain" />
+            </View>
+          </Tile>
+          <Tile wide={wide} grey eyebrow="Step 3" title="You get a fair score." text="Each kind of harsh moment, compared with what's normal on those roads.">
+            <View style={s.moments}>
+              {SAMPLE_MOMENTS.slice(0, 2).map((moment, i) => <MomentRow key={moment.kind} moment={moment} first={i === 0} />)}
+            </View>
+          </Tile>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function TheApp({ wide }: { wide: boolean }) {
+  return (
+    <View style={[s.band, s.grey]}>
+      <View style={[s.content, wide ? s.appWide : s.appNarrow]}>
+        <View style={wide ? s.flex : undefined}>
+          <Text style={s.eyebrowSmall}>The FairDrive app</Text>
+          <Text style={[s.h2, !wide && s.h2Narrow]}>Your score, a moment after you park.</Text>
+          <View style={s.features}>
+            <Feature icon="numeric-2-circle-outline" title="Two scores" text="One for your driving, one for how hard the conditions were." />
+            <Feature icon="format-list-bulleted" title="Three plain reasons" text="What shaped the score, in words you can act on." />
+            <Feature icon="chart-line" title="Progress over time" text="See which kinds of harsh moment are getting better." />
           </View>
-          <Text style={[s.h1, !wide && s.h1Narrow]}>
-            Scored on your driving.{'\n'}<Text style={{ color: GREEN_TEXT }}>Not on your roads.</Text>
-          </Text>
-          <Text style={s.heroLead}>
-            Most driving apps count hard brakes and sharp turns, so a careful driver on busy streets can score worse than a careless
-            one on an empty highway. FairDrive compares every trip with what's normal for its roads, light and weather.
-          </Text>
-          <View style={s.buttonRow}>
-            <Button label="See how it works" icon="arrow-down" onPress={onHow} />
-            <Button label="Admin login" icon="lock-outline" secondary onPress={onAdmin} />
-          </View>
-          <View style={s.checks}>
-            <Check text="Two scores, three plain reasons" />
-            <Check text="Start and end of every trip hidden" />
-          </View>
-        </SlideUp>
-        <SlideUp delay={200} style={s.phoneArea}>
-          <PhoneMock />
-          {wide && (
-            <>
-              <FloatCard style={s.floatTopLeft} icon="weather-partly-cloudy" label="Conditions" value="Fairly easy" />
-              <FloatCard style={s.floatBottomRight} icon="history" label="Old score" value="55 · ignores roads" />
-            </>
-          )}
-        </SlideUp>
+        </View>
+        <PhoneMock />
       </View>
     </View>
   );
@@ -125,7 +172,6 @@ function PhoneMock() {
             <MaterialCommunityIcons name="battery-high" size={15} color={T.text} />
           </View>
         </View>
-        <Text style={s.phoneBrand}>FairDrive</Text>
         <Text style={s.phoneTitle}>Your drive</Text>
         <View style={[ui.card, s.phoneCard]}>
           <LinearGradient colors={[`${T.ring.good[0]}22`, '#FFFFFF00']} style={StyleSheet.absoluteFill} />
@@ -141,442 +187,308 @@ function PhoneMock() {
   );
 }
 
-function Statement({ wide }: { wide: boolean }) {
-  const hi = { color: GREEN_TEXT };
-  return (
-    <Reveal style={[s.frame, s.statement]}>
-      <Text style={[s.statementText, !wide && s.statementNarrow]}>
-        A trip through town needs <Text style={hi}>more braking</Text> than a drive on the 401. Old scores call that{' '}
-        <Text style={s.strike}>bad driving</Text>. FairDrive calls it <Text style={hi}>normal</Text>.
-      </Text>
-    </Reveal>
-  );
-}
-
-function HowItWorks({ wide }: { wide: boolean }) {
-  return (
-    <Reveal anchor="how" style={[s.frame, s.section]}>
-      <SectionHead kicker="How it works" title="From your drive to a fair score" lead="No extra hardware. Just a phone in a mount." />
-      <View style={[s.cards, wide && s.cardsWide]}>
-        <StepCard number={1} wide={wide} title="Drive with your phone" text="Mount your phone, tap Start and drive. It records how the car moves, and where.">
-          <Image source={require('../assets/landing/phone-mount.jpg')} style={s.stepPhoto} resizeMode="cover" accessibilityLabel="A phone in a dashboard mount, on a tree-lined street" />
-        </StepCard>
-        <StepCard number={2} wide={wide} title="We read the conditions" text="FairDrive looks up the road types, speed limits, daylight and weather along your route.">
-          <View style={s.conditionGrid}>
-            <Condition icon="road-variant" label="Main road" />
-            <Condition icon="car-speed-limiter" label="50 km/h" />
-            <Condition icon="weather-night" label="After dark" />
-            <Condition icon="weather-rainy" label="Light rain" />
-          </View>
-        </StepCard>
-        <StepCard number={3} wide={wide} title="You get a fair score" text="Each harsh moment is compared with what's normal on those roads, with a reason you can act on.">
-          <View style={s.stepMoments}>
-            {SAMPLE_MOMENTS.slice(0, 2).map((moment, i) => <MomentRow key={moment.kind} moment={moment} first={i === 0} />)}
-          </View>
-        </StepCard>
-      </View>
-    </Reveal>
-  );
-}
-
 function TwoScores({ wide }: { wide: boolean }) {
   return (
-    <Reveal anchor="scores" style={[s.frame, s.section]}>
-      <SectionHead kicker="Two scores" title="One is yours. One is the road's." lead="Busy streets, darkness and rain aren't your fault, so they get their own score." />
-      <View style={[s.cards, wide && s.cardsWide]}>
-        <ScoreExplainer
-          icon="steering" color={T.ring.good} title="Driving score" tag="Yours to control" value={72}
-          text="Your hard braking, sharp speeding up and sharp turns, compared with what's normal for the trip's conditions. 50 is normal, 100 is none at all."
-        />
-        <ScoreExplainer
-          icon="weather-partly-cloudy" color={T.ring.fair} title="Conditions score" tag="Not your fault" value={64}
-          text="How demanding the trip was: road types, speed limits, daylight and weather. 100 is the easiest kind of drive."
-        />
+    <View style={s.band}>
+      <View style={s.content}>
+        <Heading title="Two scores." rest="One is yours. One is the road's." />
+        <View style={[s.tiles, wide && s.row]}>
+          <ScoreTile wide={wide} eyebrow="Yours to control" title="Driving score" value={72} color={T.ring.good}
+            text="Your hard braking, sharp speeding up and sharp turns against what's normal for the trip. 50 is normal, 100 is none at all." />
+          <ScoreTile wide={wide} eyebrow="Not your fault" title="Conditions score" value={64} color={T.ring.fair}
+            text="How demanding the trip was: road types, speed limits, daylight and weather. 100 is the easiest kind of drive." />
+        </View>
       </View>
-    </Reveal>
+    </View>
   );
 }
 
-function Proof({ wide }: { wide: boolean }) {
-  const { bottom } = useContext(Page);
-  const [top, setTop] = useState(Infinity);
-  const visible = bottom > top + 160;
+function Results({ wide }: { wide: boolean }) {
   return (
-    <Reveal anchor="proof" style={[s.frame, s.section]}>
-      <View onLayout={(e) => setTop(e.nativeEvent.layout.y)} />
-      <SectionHead kicker="Results" title="The old score swings with the road. FairDrive doesn't." lead="Average scores for the same drivers on different kinds of road." />
-      <View style={[s.cards, wide && s.cardsWide]}>
-        <GapCard title="Old score" note="Ignores conditions" values={[51.2, 70.1]} gap="19-point gap" bad visible={visible} />
-        <GapCard title="FairDrive" note="Compares with what's normal" values={[57.7, 59.0]} gap="1-point gap" visible={visible} />
+    <View style={[s.band, s.black]}>
+      <View style={s.content}>
+        <Text style={[s.h2, s.onBlack, s.centerText, !wide && s.h2Narrow]}>The old score swings with the road.{'\n'}FairDrive doesn't.</Text>
+        <Text style={[s.lead, s.onBlackSecondary, s.centerText]}>Average scores for the same drivers on different kinds of road.</Text>
+        <View style={[s.tiles, wide && s.row]}>
+          <GapTile wide={wide} title="Old score" gap="19-point gap" values={[70.1, 51.2]} color={T.ring.poor[0]} />
+          <GapTile wide={wide} title="FairDrive" gap="1-point gap" values={[59.0, 57.7]} color={T.ring.good[0]} />
+        </View>
+        <View style={[s.stats, wide && s.row]}>
+          <Stat value="93%" text="smaller score gap between road types than the old score" />
+          <Stat value="22.6%" text="more accurate than a simple average, on drivers it had never seen" />
+          <Stat value="500 m" text="hidden at the start and end of every trip" />
+        </View>
+        <Text style={[s.small, s.onBlackSecondary, s.centerText]}>Measured on UAH-DriveSet: 6 drivers, 37 trips, Spain. Ontario drives are next.</Text>
       </View>
-      <View style={[s.stats, wide && s.statsWide]}>
-        <BigStat value={93} suffix="%" text="smaller score gap between road types than the old score" visible={visible} />
-        <BigStat value={22.6} decimals={1} suffix="%" text="more accurate than a simple average, on drivers it had never seen" visible={visible} />
-        <BigStat value={500} suffix=" m" text="hidden at the start and end of every trip" visible={visible} />
-      </View>
-      <Text style={[ui.muted, ui.centerText]}>Measured on UAH-DriveSet: 6 drivers, 37 trips, Spain. Ontario drives are next.</Text>
-    </Reveal>
+    </View>
   );
 }
 
 function Privacy({ wide }: { wide: boolean }) {
   return (
-    <Reveal anchor="privacy" style={[s.frame, s.section]}>
-      <LinearGradient colors={['#12151B', '#1D2430']} style={[s.dark, wide && s.darkWide]}>
-        <View style={wide ? s.darkText : undefined}>
-          <Text style={s.darkKicker}>Privacy</Text>
-          <Text style={s.darkTitle}>Built to respect the people being scored.</Text>
-          <Text style={s.darkLead}>A score is only fair if drivers can trust what happens to their data.</Text>
+    <View style={s.band}>
+      <View style={[s.content, s.centered]}>
+        <MaterialCommunityIcons name="lock" size={56} color={A.blue} />
+        <Text style={[s.h2, s.centerText, !wide && s.h2Narrow]}>Privacy. Built in from the first metre.</Text>
+        <Text style={[s.lead, s.centerText]}>A score is only fair if drivers can trust what happens to their data.</Text>
+        <View style={[s.privacyRow, wide && s.row]}>
+          <Point icon="home-lock-open" title="Home and work stay private" text="The first and last 500 m of every trip are cut before anything is saved." />
+          <Point icon="database-off-outline" title="No raw sensor data kept" text="Only the cleaned trip is stored, never the phone's raw readings." />
+          <Point icon="account-lock-outline" title="Only you see your trips" text="Each driver has an account and can delete it, with every trip, at any time." />
         </View>
-        <View style={[s.darkList, wide && s.darkListWide]}>
-          <DarkPoint icon="home-lock" title="Home and work stay private" text="The first and last 500 m of every trip are cut before anything is saved." />
-          <DarkPoint icon="database-off-outline" title="No raw sensor data kept" text="Only the cleaned trip is stored, never the phone's raw readings." />
-          <DarkPoint icon="shield-account-outline" title="Admins sign in" text="Each admin has their own account. Passwords are never stored as plain text." />
-        </View>
-      </LinearGradient>
-    </Reveal>
+      </View>
+    </View>
   );
 }
 
-function FinalCall({ onHow, onAdmin }: { onHow: () => void; onAdmin: () => void }) {
+function FinalCall({ wide, onHow, onAdmin }: { wide: boolean; onHow: () => void; onAdmin: () => void }) {
+  const [width, setWidth] = useState(0);
   return (
-    <Reveal style={[s.frame, s.final]}>
-      <ImageBackground source={require('../assets/landing/highway-dusk.jpg')} style={s.finalCard} imageStyle={s.finalImage} accessibilityLabel="An empty highway at dusk">
-        <LinearGradient colors={['rgba(9,12,20,0.62)', 'rgba(9,12,20,0.28)', 'rgba(9,12,20,0.7)']} style={StyleSheet.absoluteFill} />
-        <View style={s.finalText}>
-          <Text style={[s.h2, s.finalTitle]}>Drive. Stop. See your fair score.</Text>
-          <Text style={s.finalLead}>Your score arrives on your phone a moment after you park, with three plain reasons behind it.</Text>
-          <View style={[s.buttonRow, s.centerRow]}>
-            <Button label="See how it works" icon="arrow-up" light onPress={onHow} />
-            <Button label="Admin login" icon="lock-outline" glass onPress={onAdmin} />
+    <View style={[s.band, s.grey]}>
+      <View style={s.content} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+        <View style={[s.final, { height: Math.max(460, width * 0.5) }]}>
+          <Image source={PHOTOS.dusk} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityLabel="An empty highway at dusk" />
+          <LinearGradient colors={['rgba(0,0,0,0.55)', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.35)']} style={StyleSheet.absoluteFill} />
+          <View style={[s.centered, s.finalText]}>
+            <Text style={[s.h2, s.onBlack, s.centerText, !wide && s.h2Narrow]}>Drive. Stop.{'\n'}See your fair score.</Text>
+            <View style={s.actions}>
+              <Pill label="See how it works" onPress={onHow} />
+              <More label="Admin login" onPress={onAdmin} light />
+            </View>
           </View>
         </View>
-        <View style={s.finalRoad}><DrivingRoad kmh={80} /></View>
-      </ImageBackground>
-    </Reveal>
+      </View>
+    </View>
   );
 }
 
 function Footer({ onAdmin }: { onAdmin: () => void }) {
   return (
-    <View style={[s.frame, s.footer]}>
-      <Logo />
-      <Text style={ui.muted}>A student project, 2026. Scores tested on UAH-DriveSet; Ontario drives in progress.</Text>
-      <Pressable onPress={onAdmin}><Text style={s.footerLink}>Admin login</Text></Pressable>
+    <View style={[s.grey, s.footer]}>
+      <View style={[s.content, s.footerInner]}>
+        <Text style={s.footerText}>FairDrive is a student project, 2026. Scores tested on UAH-DriveSet; Ontario drives in progress.</Text>
+        <View style={s.footerRule} />
+        <View style={s.footerRow}>
+          <Text style={s.footerText}>Photos generated with Gemini.</Text>
+          <Pressable onPress={onAdmin}><Text style={[s.footerText, s.footerLink]}>Admin login</Text></Pressable>
+        </View>
+      </View>
     </View>
   );
 }
 
 // Pieces
 
-const Logo = () => (
-  <View style={s.logo}>
-    <LinearGradient colors={T.ring.good} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.logoMark}>
-      <MaterialCommunityIcons name="car-side" size={16} color="#FFFFFF" />
-    </LinearGradient>
-    <Text style={s.logoText}>FairDrive</Text>
-  </View>
-);
-
-function Button(p: { label: string; icon: IconName; onPress: () => void; secondary?: boolean; small?: boolean; light?: boolean; glass?: boolean }) {
-  const darkText = p.secondary || p.light;
+/** A photo that keeps its shape at any width. The browser otherwise sizes an image from the file, not the layout. */
+function Photo({ source, ratio, radius = 0, maxWidth, label }: { source: ImageSourcePropType; ratio: number; radius?: number; maxWidth?: number; label: string }) {
+  const [width, setWidth] = useState(0);
   return (
-    <Pressable onPress={p.onPress} style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
-      s.button, p.secondary && s.buttonSecondary, p.light && s.buttonLight, p.glass && s.buttonGlass, p.small && s.buttonSmall,
-      hovered && s.buttonHover, pressed && ui.pressed,
-    ]}>
-      <Text style={[s.buttonText, darkText && s.buttonTextSecondary, p.small && s.buttonTextSmall]}>{p.label}</Text>
-      <MaterialCommunityIcons name={p.icon} size={p.small ? 15 : 18} color={darkText ? T.text : '#FFFFFF'} />
-    </Pressable>
+    <View style={[s.photoBox, maxWidth ? { maxWidth } : null]} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+      {width > 0 && <Image source={source} style={{ width, height: width / ratio, borderRadius: radius }} resizeMode="cover" accessibilityLabel={label} />}
+    </View>
   );
 }
 
-const Check = ({ text }: { text: string }) => (
-  <View style={s.check}>
-    <MaterialCommunityIcons name="check-circle" size={18} color={T.ring.good[0]} />
-    <Text style={s.checkText}>{text}</Text>
-  </View>
+const Heading = ({ title, rest }: { title: string; rest: string }) => (
+  <Text style={s.heading}>{title} <Text style={s.headingGrey}>{rest}</Text></Text>
 );
 
-const FloatCard = ({ style, icon, label, value }: { style: object; icon: IconName; label: string; value: string }) => (
-  <View style={[s.float, style]}>
-    <View style={s.floatIcon}><MaterialCommunityIcons name={icon} size={18} color={T.text} /></View>
-    <View>
-      <Text style={ui.label}>{label}</Text>
-      <Text style={s.floatValue}>{value}</Text>
+function Tile(p: { wide: boolean; grey?: boolean; eyebrow: string; title: string; text: string; children: ReactNode }) {
+  return (
+    <View style={[s.tile, p.grey && s.tileGrey, p.wide && s.flex]}>
+      <Text style={s.tileEyebrow}>{p.eyebrow}</Text>
+      <Text style={s.tileTitle}>{p.title}</Text>
+      <Text style={s.tileText}>{p.text}</Text>
+      <View style={s.tileVisual}>{p.children}</View>
     </View>
-  </View>
-);
-
-const SectionHead = ({ kicker, title, lead }: { kicker: string; title: string; lead: string }) => (
-  <View style={s.sectionHead}>
-    <Text style={s.kicker}>{kicker}</Text>
-    <Text style={[s.h2, ui.centerText]}>{title}</Text>
-    <Text style={[ui.lead, ui.centerText]}>{lead}</Text>
-  </View>
-);
-
-const StepCard = ({ number, title, text, wide, children }: { number: number; title: string; text: string; wide: boolean; children: ReactNode }) => (
-  <View style={[ui.card, s.step, wide && s.stepWide]}>
-    <View style={s.stepNumber}><Text style={s.stepNumberText}>{number}</Text></View>
-    <Text style={s.cardTitle}>{title}</Text>
-    <Text style={ui.muted}>{text}</Text>
-    <View style={s.stepVisual}>{children}</View>
-  </View>
-);
+  );
+}
 
 const Condition = ({ icon, label }: { icon: IconName; label: string }) => (
   <View style={s.condition}>
-    <MaterialCommunityIcons name={icon} size={20} color={T.text} />
+    <MaterialCommunityIcons name={icon} size={22} color={A.blue} />
     <Text style={s.conditionText}>{label}</Text>
   </View>
 );
 
-function ScoreExplainer(p: { icon: IconName; color: readonly [string, string]; title: string; tag: string; value: number; text: string }) {
-  return (
-    <View style={[ui.card, s.explainer]}>
-      <LinearGradient colors={[`${p.color[0]}1A`, '#FFFFFF00']} style={StyleSheet.absoluteFill} />
-      <View style={s.explainerHead}>
-        <View style={[s.explainerIcon, { backgroundColor: `${p.color[0]}26` }]}>
-          <MaterialCommunityIcons name={p.icon} size={22} color={p.color[0]} />
-        </View>
-        <View style={[s.tag, { backgroundColor: `${p.color[0]}1F` }]}>
-          <Text style={[s.tagText, { color: p.color[1] }]}>{p.tag}</Text>
-        </View>
-      </View>
-      <Text style={s.explainerValue}>{p.value}</Text>
-      <Text style={s.cardTitle}>{p.title}</Text>
-      <Text style={ui.muted}>{p.text}</Text>
-    </View>
-  );
-}
-
-function GapCard({ title, note, values, gap, bad, visible }: { title: string; note: string; values: [number, number]; gap: string; bad?: boolean; visible: boolean }) {
-  const colors = bad ? T.ring.poor : T.ring.good;
-  return (
-    <View style={[ui.card, s.gapCard]}>
-      <View style={s.gapHead}>
-        <View>
-          <Text style={s.cardTitle}>{title}</Text>
-          <Text style={ui.muted}>{note}</Text>
-        </View>
-        <View style={[s.tag, { backgroundColor: `${colors[0]}1F` }]}>
-          <Text style={[s.tagText, { color: colors[1] }]}>{gap}</Text>
-        </View>
-      </View>
-      {(['Mostly highway', 'Other roads'] as const).map((label, i) => (
-        <View key={label} style={s.barRow}>
-          <View style={s.barLabelRow}>
-            <Text style={s.barLabel}>{label}</Text>
-            <Text style={s.barValue}>{values[i].toFixed(0)}</Text>
-          </View>
-          <View style={s.barTrack}>
-            <GrowBar to={values[i]} colors={colors} visible={visible} />
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function GrowBar({ to, colors, visible }: { to: number; colors: readonly [string, string]; visible: boolean }) {
-  const grow = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (visible) Animated.timing(grow, { toValue: to, duration: 1100, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
-  }, [visible]);
-  return (
-    <Animated.View style={[s.barFill, { width: grow.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }) }]}>
-      <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
-    </Animated.View>
-  );
-}
-
-function BigStat({ value, decimals = 0, suffix, text, visible }: { value: number; decimals?: number; suffix: string; text: string; visible: boolean }) {
-  const count = useRef(new Animated.Value(0)).current;
-  const [shown, setShown] = useState(0);
-  useEffect(() => {
-    const id = count.addListener(({ value: v }) => setShown(v));
-    if (visible) Animated.timing(count, { toValue: value, duration: 1400, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
-    return () => count.removeListener(id);
-  }, [visible]);
-  return (
-    <View style={s.stat}>
-      <Text style={s.statValue}>{shown.toFixed(decimals)}{suffix}</Text>
-      <Text style={[ui.muted, ui.centerText, s.statText]}>{text}</Text>
-    </View>
-  );
-}
-
-const DarkPoint = ({ icon, title, text }: { icon: IconName; title: string; text: string }) => (
-  <View style={s.darkPoint}>
-    <View style={s.darkIcon}><MaterialCommunityIcons name={icon} size={20} color={T.ring.good[0]} /></View>
+const Feature = ({ icon, title, text }: { icon: IconName; title: string; text: string }) => (
+  <View style={s.feature}>
+    <MaterialCommunityIcons name={icon} size={28} color={A.blue} />
     <View style={s.flex}>
-      <Text style={s.darkPointTitle}>{title}</Text>
-      <Text style={s.darkPointText}>{text}</Text>
+      <Text style={s.featureTitle}>{title}</Text>
+      <Text style={s.tileText}>{text}</Text>
     </View>
   </View>
 );
 
-function SlideUp({ delay, style, children }: { delay: number; style?: object; children: ReactNode }) {
-  const appear = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.timing(appear, { toValue: 1, duration: 700, delay, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
-  }, []);
-  const rise = appear.interpolate({ inputRange: [0, 1], outputRange: [32, 0] });
-  return <Animated.View style={[style, { opacity: appear, transform: [{ translateY: rise }] }]}>{children}</Animated.View>;
+const ScoreTile = (p: { wide: boolean; eyebrow: string; title: string; value: number; color: readonly [string, string]; text: string }) => (
+  <View style={[s.tile, s.tileGrey, p.wide && s.flex]}>
+    <Text style={s.tileEyebrow}>{p.eyebrow}</Text>
+    <Text style={s.tileTitle}>{p.title}</Text>
+    <Text style={[s.scoreValue, { color: p.color[0] }]}>{p.value}</Text>
+    <Text style={s.tileText}>{p.text}</Text>
+  </View>
+);
+
+const GapTile = ({ wide, title, gap, values, color }: { wide: boolean; title: string; gap: string; values: [number, number]; color: string }) => (
+  <View style={[s.darkTile, wide && s.flex]}>
+    <View style={s.gapHead}>
+      <Text style={[s.tileTitle, s.onBlack]}>{title}</Text>
+      <Text style={[s.gapLabel, { color }]}>{gap}</Text>
+    </View>
+    {(['Mostly highway', 'Other roads'] as const).map((label, i) => (
+      <View key={label} style={s.bar}>
+        <View style={s.barLabels}>
+          <Text style={[s.small, s.onBlackSecondary]}>{label}</Text>
+          <Text style={[s.small, s.onBlack, s.barValue]}>{values[i].toFixed(0)}</Text>
+        </View>
+        <View style={s.barTrack}><View style={[s.barFill, { width: `${values[i]}%`, backgroundColor: color }]} /></View>
+      </View>
+    ))}
+  </View>
+);
+
+const Stat = ({ value, text }: { value: string; text: string }) => (
+  <View style={s.stat}>
+    <Text style={s.statValue}>{value}</Text>
+    <Text style={[s.small, s.onBlackSecondary, s.centerText, s.statText]}>{text}</Text>
+  </View>
+);
+
+const Point = ({ icon, title, text }: { icon: IconName; title: string; text: string }) => (
+  <View style={s.point}>
+    <MaterialCommunityIcons name={icon} size={30} color={A.text} />
+    <Text style={[s.featureTitle, s.centerText]}>{title}</Text>
+    <Text style={[s.tileText, s.centerText]}>{text}</Text>
+  </View>
+);
+
+function Pill({ label, small, onPress }: { label: string; small?: boolean; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [s.pill, small && s.pillSmall, hovered && s.pillHover]}>
+      <Text style={[s.pillText, small && s.pillTextSmall]}>{label}</Text>
+    </Pressable>
+  );
 }
 
-/** Fades a section up the first time it scrolls into view, and registers its position under `anchor`. */
-function Reveal({ anchor, style, children }: { anchor?: string; style?: object | object[]; children: ReactNode }) {
-  const { bottom, register } = useContext(Page);
-  const [top, setTop] = useState(Infinity);
-  const appear = useRef(new Animated.Value(0)).current;
-  const shown = bottom > top + 80;
-  useEffect(() => {
-    if (shown) Animated.timing(appear, { toValue: 1, duration: 650, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
-  }, [shown]);
-  const onLayout = (e: LayoutChangeEvent) => {
-    setTop(e.nativeEvent.layout.y);
-    if (anchor) register(anchor, e.nativeEvent.layout.y);
-  };
-  const rise = appear.interpolate({ inputRange: [0, 1], outputRange: [40, 0] });
-  return <Animated.View onLayout={onLayout} style={[style, { opacity: appear, transform: [{ translateY: rise }] }]}>{children}</Animated.View>;
+function More({ label, light, onPress }: { label: string; light?: boolean; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress}>
+      {({ hovered }: { pressed: boolean; hovered?: boolean }) => (
+        <Text style={[s.more, light && s.moreLight, hovered && s.moreHover]}>{label} ›</Text>
+      )}
+    </Pressable>
+  );
 }
+
+const f = (style: TextStyle): TextStyle => ({ fontFamily: FONT, color: A.text, ...style });
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: T.background[0] },
+  root: { flex: 1, backgroundColor: A.white },
   flex: { flex: 1 },
-  frame: { width: '100%', maxWidth: 1180, alignSelf: 'center', paddingHorizontal: 24 },
+  row: { flexDirection: 'row' },
+  content: { width: '100%', maxWidth: 980, alignSelf: 'center', paddingHorizontal: 22 },
+  centered: { alignItems: 'center' },
+  centerText: { textAlign: 'center' },
+  band: { backgroundColor: A.white, paddingVertical: 96, gap: 56 },
+  heroBand: { paddingTop: 64 },
+  grey: { backgroundColor: A.grey },
+  black: { backgroundColor: A.black },
+  onBlack: { color: A.onBlack },
+  onBlackSecondary: { color: A.onBlackSecondary },
 
-  navWrap: { position: 'absolute', top: 16, left: 0, right: 0, alignItems: 'center', paddingHorizontal: 16 },
   nav: {
-    width: '100%', maxWidth: 1100, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16,
-    backgroundColor: 'rgba(255,255,255,0.72)', borderRadius: 999, paddingLeft: 20, paddingRight: 8, paddingVertical: 8,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(16px)',
+    height: 52, justifyContent: 'center', backgroundColor: 'rgba(251,251,253,0.8)',
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.16)', backdropFilter: 'saturate(180%) blur(20px)',
   } as object,
-  navRaised: { backgroundColor: 'rgba(255,255,255,0.9)', ...T.cardShadow },
-  navLinks: { flexDirection: 'row', gap: 28 },
-  navLink: { color: T.text, fontSize: 15, fontWeight: '600' },
-  navLinkBox: { opacity: 0.7 },
+  navRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  wordmark: f({ fontSize: 21, fontWeight: '600', letterSpacing: 0.2 }),
+  navLinks: { flexDirection: 'row', gap: 32 },
+  navLink: f({ fontSize: 13, opacity: 0.8 }),
   navLinkHover: { opacity: 1 },
-  logo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  logoMark: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  logoText: { color: T.text, fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
 
-  hero: { paddingTop: 140, paddingBottom: 80, overflow: 'hidden' },
-  glow: { position: 'absolute', width: 620, height: 620, borderRadius: 310, filter: 'blur(90px)' } as object,
-  glowGreen: { top: -160, right: -80, backgroundColor: 'rgba(34,197,94,0.22)' },
-  glowTeal: { top: 220, left: -220, backgroundColor: 'rgba(16,185,168,0.16)' },
-  heroWide: { flexDirection: 'row', alignItems: 'center', gap: 48 },
-  heroNarrow: { gap: 48 },
-  heroText: { flex: 1 },
-  eyebrow: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', backgroundColor: T.card, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 7, ...T.cardShadow },
-  eyebrowDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: T.ring.good[0] },
-  eyebrowText: { color: T.text, fontSize: 14, fontWeight: '600' },
-  h1: { color: T.text, fontSize: 68, lineHeight: 72, fontWeight: '800', letterSpacing: -2.6, marginTop: 24 },
-  h1Narrow: { fontSize: 44, lineHeight: 48, letterSpacing: -1.6 },
-  heroLead: { color: T.muted, fontSize: 19, lineHeight: 29, marginTop: 22, maxWidth: 560 },
-  buttonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 32 },
-  centerRow: { justifyContent: 'center' },
-  checks: { flexDirection: 'row', flexWrap: 'wrap', gap: 20, marginTop: 28 },
-  check: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  checkText: { color: T.text, fontSize: 15, fontWeight: '600' },
+  heroText: { gap: 18 },
+  eyebrow: f({ fontSize: 24, fontWeight: '600' }),
+  h1: f({ fontSize: 80, lineHeight: 84, fontWeight: '600', letterSpacing: -1.6, textAlign: 'center' }),
+  h1Narrow: { fontSize: 44, lineHeight: 48, letterSpacing: -0.8 },
+  lead: f({ fontSize: 21, lineHeight: 30, color: A.secondary, maxWidth: 680, alignSelf: 'center' }),
+  actions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: 28, marginTop: 10 },
+  photoBox: { width: '100%', alignSelf: 'center' },
 
-  button: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: T.text, borderRadius: 999, paddingHorizontal: 24, paddingVertical: 16 },
-  buttonSecondary: { backgroundColor: T.card, ...T.cardShadow },
-  buttonLight: { backgroundColor: '#FFFFFF' },
-  buttonGlass: { backgroundColor: 'rgba(255,255,255,0.14)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
-  buttonSmall: { paddingHorizontal: 16, paddingVertical: 10 },
-  buttonHover: { transform: [{ translateY: -1 }], opacity: 0.92 },
-  buttonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
-  buttonTextSecondary: { color: T.text },
-  buttonTextSmall: { fontSize: 14 },
+  statement: f({ fontSize: 48, lineHeight: 56, fontWeight: '600', letterSpacing: -0.8, marginBottom: 56 }),
+  statementNarrow: { fontSize: 30, lineHeight: 36, letterSpacing: -0.4 },
+  statementGrey: { color: A.secondary },
+  heading: f({ fontSize: 40, lineHeight: 46, fontWeight: '600', letterSpacing: -0.5, marginBottom: 40 }),
+  headingGrey: { color: A.secondary },
+  h2: f({ fontSize: 56, lineHeight: 62, fontWeight: '600', letterSpacing: -1, marginBottom: 14 }),
+  h2Narrow: { fontSize: 36, lineHeight: 42, letterSpacing: -0.5 },
+  eyebrowSmall: f({ fontSize: 17, fontWeight: '600', color: A.secondary, marginBottom: 10 }),
+  small: f({ fontSize: 14, lineHeight: 20 }),
 
-  phoneArea: { alignItems: 'center', justifyContent: 'center' },
-  phone: { width: 320, height: 660, borderRadius: 52, backgroundColor: '#0F1115', padding: 10, shadowColor: '#0F1115', shadowOpacity: 0.28, shadowRadius: 50, shadowOffset: { width: 0, height: 30 } },
-  phoneScreen: { flex: 1, borderRadius: 43, overflow: 'hidden', backgroundColor: T.background[0], paddingHorizontal: 14, gap: 10 },
+  tiles: { gap: 20 },
+  tile: { backgroundColor: A.white, borderRadius: 28, padding: 32, gap: 8 },
+  tileGrey: { backgroundColor: A.grey },
+  tileEyebrow: f({ fontSize: 12, fontWeight: '600', color: A.secondary, textTransform: 'uppercase', letterSpacing: 0.6 }),
+  tileTitle: f({ fontSize: 28, lineHeight: 32, fontWeight: '600', letterSpacing: -0.3 }),
+  tileText: f({ fontSize: 17, lineHeight: 25, color: A.secondary }),
+  tileVisual: { marginTop: 20 },
+
+  conditions: { gap: 10 },
+  condition: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: A.white, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14 },
+  conditionText: f({ fontSize: 17, fontWeight: '500' }),
+  moments: { backgroundColor: A.white, borderRadius: 18, paddingHorizontal: 16 },
+
+  appWide: { flexDirection: 'row', alignItems: 'center', gap: 64 },
+  appNarrow: { gap: 48, alignItems: 'center' },
+  features: { gap: 28, marginTop: 20 },
+  feature: { flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
+  featureTitle: f({ fontSize: 19, fontWeight: '600', marginBottom: 2 }),
+
+  phone: { width: 320, height: 640, borderRadius: 54, backgroundColor: '#1D1D1F', padding: 11, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 40, shadowOffset: { width: 0, height: 24 } },
+  phoneScreen: { flex: 1, borderRadius: 44, overflow: 'hidden', backgroundColor: T.background[0], paddingHorizontal: 14, gap: 10 },
   statusBar: { height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12 },
   statusText: { color: T.text, fontSize: 14, fontWeight: '700' },
-  island: { width: 92, height: 26, borderRadius: 13, backgroundColor: '#0F1115' },
+  island: { width: 92, height: 26, borderRadius: 13, backgroundColor: '#1D1D1F' },
   statusIcons: { flexDirection: 'row', gap: 4 },
-  phoneBrand: { color: T.text, fontSize: 12, fontWeight: '800', paddingHorizontal: 4 },
-  phoneTitle: { color: T.text, fontSize: 24, fontWeight: '800', letterSpacing: -0.6, paddingHorizontal: 4, marginTop: -6 },
+  phoneTitle: { color: T.text, fontSize: 24, fontWeight: '800', letterSpacing: -0.6, paddingHorizontal: 4 },
   phoneCard: { alignItems: 'center', overflow: 'hidden', paddingVertical: 14, gap: 4 },
   phoneHeadline: { color: T.text, fontSize: 17, fontWeight: '800', marginTop: 4 },
   phoneMoments: { paddingVertical: 4, paddingHorizontal: 14 },
-  float: { position: 'absolute', flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: T.card, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 12, ...T.cardShadow, shadowOpacity: 0.12, shadowRadius: 30 },
-  floatTopLeft: { top: 110, left: -10 },
-  floatBottomRight: { bottom: -22, right: -36 },
-  floatIcon: { width: 36, height: 36, borderRadius: 12, backgroundColor: T.track, alignItems: 'center', justifyContent: 'center' },
-  floatValue: { color: T.text, fontSize: 15, fontWeight: '800' },
 
-  statement: { paddingVertical: 80, alignItems: 'center' },
-  statementText: { color: T.text, fontSize: 46, lineHeight: 56, fontWeight: '800', letterSpacing: -1.6, textAlign: 'center', maxWidth: 940 },
-  statementNarrow: { fontSize: 30, lineHeight: 38, letterSpacing: -0.8 },
-  strike: { color: T.faint, textDecorationLine: 'line-through' },
+  scoreValue: f({ fontSize: 96, lineHeight: 104, fontWeight: '600', letterSpacing: -3, marginVertical: 8, fontVariant: ['tabular-nums'] }),
 
-  section: { paddingVertical: 64, gap: 36 },
-  sectionHead: { alignItems: 'center', gap: 12, maxWidth: 720, alignSelf: 'center' },
-  kicker: { color: GREEN_TEXT, fontSize: 14, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.4 },
-  h2: { color: T.text, fontSize: 44, lineHeight: 50, fontWeight: '800', letterSpacing: -1.4 },
-  cards: { gap: 18 },
-  cardsWide: { flexDirection: 'row' },
-  cardTitle: { color: T.text, fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
+  darkTile: { backgroundColor: '#1D1D1F', borderRadius: 28, padding: 32, gap: 20 },
+  gapHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  gapLabel: f({ fontSize: 17, fontWeight: '600' }),
+  bar: { gap: 8 },
+  barLabels: { flexDirection: 'row', justifyContent: 'space-between' },
+  barValue: { fontWeight: '600', fontVariant: ['tabular-nums'] },
+  barTrack: { height: 8, borderRadius: 4, backgroundColor: '#333336' },
+  barFill: { height: 8, borderRadius: 4 },
+  stats: { gap: 40, marginVertical: 24 },
+  stat: { flex: 1, alignItems: 'center', gap: 8 },
+  statValue: f({ fontSize: 64, lineHeight: 70, fontWeight: '600', letterSpacing: -1.5, color: A.onBlack }),
+  statText: { maxWidth: 240 },
 
-  step: { padding: 24, gap: 10 },
-  stepWide: { flex: 1 },
-  stepNumber: { width: 32, height: 32, borderRadius: 16, borderWidth: 1.5, borderColor: T.track, alignItems: 'center', justifyContent: 'center' },
-  stepNumberText: { color: T.text, fontSize: 14, fontWeight: '800' },
-  stepVisual: { marginTop: 10, minHeight: 130, justifyContent: 'center' },
-  stepPhoto: { width: '100%', height: 240, borderRadius: 20 },
-  stepMoments: { backgroundColor: T.background[0], borderRadius: 20, paddingHorizontal: 14 },
-  conditionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  condition: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: T.background[0], borderRadius: 14, paddingHorizontal: 12, paddingVertical: 11, flexGrow: 1, flexBasis: 130 },
-  conditionText: { color: T.text, fontSize: 14, fontWeight: '700' },
+  privacyRow: { gap: 40, marginTop: 40 },
+  point: { flex: 1, alignItems: 'center', gap: 10 },
 
-  explainer: { flex: 1, padding: 28, gap: 8, overflow: 'hidden' },
-  explainerHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  explainerIcon: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  explainerValue: { color: T.text, fontSize: 84, fontWeight: '800', letterSpacing: -4, fontVariant: ['tabular-nums'], marginTop: 8 },
-  tag: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
-  tagText: { fontSize: 13, fontWeight: '800' },
+  final: { borderRadius: 28, overflow: 'hidden', justifyContent: 'center' },
+  finalText: { paddingHorizontal: 24 },
 
-  gapCard: { flex: 1, padding: 26, gap: 18 },
-  gapHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
-  barRow: { gap: 8 },
-  barLabelRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  barLabel: { color: T.text, fontSize: 15, fontWeight: '600' },
-  barValue: { color: T.text, fontSize: 15, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  barTrack: { height: 14, borderRadius: 7, backgroundColor: T.track, overflow: 'hidden' },
-  barFill: { height: 14, borderRadius: 7, overflow: 'hidden' },
+  pill: { backgroundColor: A.blue, borderRadius: 980, paddingHorizontal: 22, paddingVertical: 12 },
+  pillSmall: { paddingHorizontal: 14, paddingVertical: 6 },
+  pillHover: { backgroundColor: '#0077ED' },
+  pillText: f({ color: '#FFFFFF', fontSize: 17, fontWeight: '400' }),
+  pillTextSmall: { fontSize: 13 },
+  more: f({ color: A.link, fontSize: 17 }),
+  moreLight: { color: '#FFFFFF' },
+  moreHover: { textDecorationLine: 'underline' },
 
-  stats: { gap: 28, marginTop: 8 },
-  statsWide: { flexDirection: 'row' },
-  stat: { flex: 1, alignItems: 'center', gap: 6 },
-  statValue: { color: T.text, fontSize: 76, fontWeight: '800', letterSpacing: -3.5, fontVariant: ['tabular-nums'] },
-  statText: { maxWidth: 260 },
-
-  dark: { borderRadius: 36, padding: 36, gap: 32 },
-  darkWide: { flexDirection: 'row', padding: 56, gap: 56 },
-  darkText: { flex: 1 },
-  darkKicker: { color: T.ring.good[0], fontSize: 14, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.4 },
-  darkTitle: { color: '#FFFFFF', fontSize: 40, lineHeight: 46, fontWeight: '800', letterSpacing: -1.2, marginTop: 12 },
-  darkLead: { color: 'rgba(255,255,255,0.68)', fontSize: 17, lineHeight: 26, marginTop: 14 },
-  darkList: { gap: 14 },
-  darkListWide: { flex: 1.1 },
-  darkPoint: { flexDirection: 'row', gap: 14, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 22, padding: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  darkIcon: { width: 40, height: 40, borderRadius: 13, backgroundColor: 'rgba(34,197,94,0.14)', alignItems: 'center', justifyContent: 'center' },
-  darkPointTitle: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
-  darkPointText: { color: 'rgba(255,255,255,0.68)', fontSize: 15, lineHeight: 22, marginTop: 3 },
-
-  final: { paddingTop: 72, paddingBottom: 56 },
-  finalCard: { borderRadius: 36, overflow: 'hidden', minHeight: 540, justifyContent: 'space-between', paddingTop: 72, paddingHorizontal: 24 },
-  finalImage: { borderRadius: 36 },
-  finalText: { alignItems: 'center', gap: 16 },
-  finalTitle: { color: '#FFFFFF', textAlign: 'center' },
-  finalLead: { color: 'rgba(255,255,255,0.85)', fontSize: 18, lineHeight: 27, textAlign: 'center', maxWidth: 560 },
-  finalRoad: { width: '100%', maxWidth: 620, alignSelf: 'center', marginTop: 48, marginBottom: -28 },
-
-  footer: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 16, paddingVertical: 32, borderTopWidth: 1, borderTopColor: T.track },
-  footerLink: { color: T.text, fontSize: 15, fontWeight: '700' },
+  footer: { paddingVertical: 28 },
+  footerInner: { gap: 12 },
+  footerRule: { height: StyleSheet.hairlineWidth, backgroundColor: A.hairline },
+  footerRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12 },
+  footerText: f({ fontSize: 12, lineHeight: 16, color: A.secondary }),
+  footerLink: { color: A.text },
 });

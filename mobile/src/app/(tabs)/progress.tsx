@@ -7,11 +7,10 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Line, Polyline, Text as SvgText } from 'react-native-svg';
 
 import { Moment, TripRow } from '../../fairdrive';
-import { DrivingRoad } from '../../motion';
 import { Page } from '../../page';
 import { T } from '../../theme';
 import { average, when } from '../../trip-parts';
-import { drivingTier, IconName, PrimaryButton, ui } from '../../ui';
+import { drivingTier, EmptyIcon, IconName, PrimaryButton, ui } from '../../ui';
 import { useMyTrips } from '../../use-my-trips';
 
 type Scored = Extract<TripRow, { scored: true }>;
@@ -29,8 +28,8 @@ export default function Progress() {
       {trips === null && error === '' && <ActivityIndicator color={T.text} style={s.loading} />}
       {trips !== null && scored.length < 2 && (
         <View style={[ui.card, s.empty]}>
-          <DrivingRoad kmh={20} />
-          <Text style={ui.cardTitle}>Your progress starts after 2 scored drives</Text>
+          <EmptyIcon icon="car-side" />
+          <Text style={[ui.cardTitle, ui.centerText]}>Your progress starts after 2 scored drives</Text>
           <Text style={[ui.muted, ui.centerText]}>
             {scored.length === 0 ? 'No scored drives yet.' : 'One scored drive so far.'} Drives of 3 km or more get a score.
           </Text>

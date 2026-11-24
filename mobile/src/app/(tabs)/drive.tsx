@@ -5,17 +5,17 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { router, useNavigation } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { sendTrip, TripResult } from '../../fairdrive';
-import { DrivingRoad } from '../../motion';
 import { Page } from '../../page';
+import { PHOTOS } from '../../photos';
 import { Live, PermissionMissing, Recorder } from '../../recorder';
 import { ScoredTrip } from '../../score';
 import { useSession } from '../../session';
 import { T } from '../../theme';
 import { sentence } from '../../trip-parts';
-import { PrimaryButton, SecondaryButton, Tip, ui } from '../../ui';
+import { Banner, PrimaryButton, SecondaryButton, Tip, ui } from '../../ui';
 
 type Screen =
   | { name: 'ready' }
@@ -92,7 +92,7 @@ function Ready({ name, onStart }: { name: string; onStart: () => void }) {
       <Text style={ui.muted}>Hi {name.split(' ')[0]}</Text>
       <Text style={ui.title}>Ready to drive</Text>
       <Text style={ui.lead}>Your score compares you with what's normal for your roads, light and weather.</Text>
-      <DrivingRoad kmh={20} />
+      <Banner source={PHOTOS.road} label="A small car driving down a country road" />
       <View style={[ui.card, ui.tips]}>
         <Tip text="Mount the phone firmly. Any angle works, but it mustn't move." />
         <Tip text="Keep this screen open. The phone stays awake while recording." />
@@ -124,7 +124,6 @@ function Recording({ live, onStop }: { live: Live; onStop: () => void }) {
         <Text style={s.timerPillText}>{minutes}:{seconds}</Text>
       </View>
       <View style={ui.center}>
-        <View style={s.roadWide}><DrivingRoad kmh={live.kmh} /></View>
         <Text style={s.bigNumber}>{live.km.toFixed(1)}</Text>
         <Text style={s.bigUnit}>km driven</Text>
         <View style={s.statRow}>
@@ -151,7 +150,7 @@ function Recording({ live, onStop }: { live: Live; onStop: () => void }) {
 function Sending() {
   return (
     <View style={[ui.page, ui.center]}>
-      <View style={s.roadWide}><DrivingRoad kmh={60} /></View>
+      <ActivityIndicator size="large" color={T.text} style={s.spinner} />
       <Text style={[ui.title, ui.centerText]}>Scoring your drive</Text>
       <Text style={[ui.lead, ui.centerText]}>Looking up the roads, daylight and weather on your route. This can take a minute.</Text>
     </View>
@@ -201,7 +200,7 @@ const s = StyleSheet.create({
   timerPill: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', backgroundColor: T.record, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8, marginTop: 12 },
   timerPillText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700', fontVariant: ['tabular-nums'] },
   dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FFFFFF' },
-  roadWide: { alignSelf: 'stretch', marginBottom: 24 },
+  spinner: { marginBottom: 24 },
   bigNumber: { color: T.text, fontSize: 120, fontWeight: '800', fontVariant: ['tabular-nums'], letterSpacing: -6 },
   bigUnit: { color: T.muted, fontSize: 17, fontWeight: '600', marginTop: -10, marginBottom: 32 },
   statRow: { flexDirection: 'row', gap: 12 },

@@ -5,11 +5,10 @@ import { router } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { TripRow } from '../../fairdrive';
-import { DrivingRoad } from '../../motion';
 import { Page } from '../../page';
 import { T } from '../../theme';
 import { day, NotScoredBadge, ScoreBadge, time } from '../../trip-parts';
-import { PrimaryButton, ui } from '../../ui';
+import { EmptyIcon, PrimaryButton, ui } from '../../ui';
 import { useMyTrips } from '../../use-my-trips';
 
 export default function Trips() {
@@ -24,7 +23,7 @@ export default function Trips() {
       {trips === null && error === '' && <ActivityIndicator color={T.text} style={s.loading} />}
       {trips !== null && trips.length === 0 && (
         <View style={[ui.card, s.empty]}>
-          <DrivingRoad kmh={20} />
+          <EmptyIcon icon="car-side" />
           <Text style={ui.cardTitle}>No drives yet</Text>
           <Text style={[ui.muted, ui.centerText]}>Your drives show up here once you send one.</Text>
           <PrimaryButton label="Start a drive" onPress={() => router.navigate('/drive')} />

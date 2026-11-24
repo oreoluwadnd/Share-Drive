@@ -2,7 +2,7 @@
 
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { ComponentProps } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, ImageSourcePropType, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { T } from './theme';
 
@@ -38,6 +38,16 @@ export function Field(p: {
     </View>
   );
 }
+
+/** A rounded photo across the screen, for the top of a page. */
+export const Banner = ({ source, label, height = 190 }: { source: ImageSourcePropType; label: string; height?: number }) => (
+  <Image source={source} style={[ui.banner, { height }]} resizeMode="cover" accessibilityLabel={label} />
+);
+
+/** A large icon in a soft circle, for empty screens. */
+export const EmptyIcon = ({ icon }: { icon: IconName }) => (
+  <View style={ui.emptyIcon}><MaterialCommunityIcons name={icon} size={36} color={T.muted} /></View>
+);
 
 export const Tip = ({ text }: { text: string }) => (
   <View style={ui.tip}>
@@ -90,7 +100,7 @@ export const ui = StyleSheet.create({
   tipText: { color: T.text, fontSize: 15, lineHeight: 21, flex: 1 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: T.track, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
   chipText: { color: T.text, fontSize: 13, fontWeight: '600' },
-  primary: { backgroundColor: T.primary, borderRadius: 999, paddingVertical: 18, alignItems: 'center', marginTop: 4 },
+  primary: { backgroundColor: T.primary, borderRadius: 999, paddingVertical: 18, paddingHorizontal: 28, alignItems: 'center', marginTop: 4 },
   primaryText: { color: T.onPrimary, fontSize: 17, fontWeight: '700' },
   danger: { backgroundColor: T.record },
   secondary: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, paddingVertical: 16 },
@@ -100,4 +110,6 @@ export const ui = StyleSheet.create({
   error: { color: T.ring.poor[1], fontSize: 15, fontWeight: '600' },
   link: { color: T.text, fontSize: 15, fontWeight: '700', textDecorationLine: 'underline' },
   row: { flexDirection: 'row' },
+  banner: { width: '100%', borderRadius: 28 },
+  emptyIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: T.track, alignItems: 'center', justifyContent: 'center' },
 });

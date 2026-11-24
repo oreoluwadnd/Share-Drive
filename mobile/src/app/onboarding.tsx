@@ -5,8 +5,8 @@ import { Link } from 'expo-router';
 import { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { DrivingRoad } from '../motion';
 import { Page } from '../page';
+import { PHOTOS } from '../photos';
 import { useSession } from '../session';
 import { T } from '../theme';
 import { IconName, PrimaryButton, ui } from '../ui';
@@ -39,8 +39,8 @@ export default function Onboarding() {
       </View>
 
       <View style={s.visual}>
-        {step === 0 && <DrivingRoad kmh={50} />}
-        {step === 1 && <Image source={require('../../assets/landing/phone-mount.jpg')} style={s.photo} resizeMode="cover" accessibilityLabel="A phone in a dashboard mount" />}
+        {step === 0 && <Image source={PHOTOS.carSide} style={s.photo} resizeMode="cover" accessibilityLabel="A small white car driving along a tree-lined road" />}
+        {step === 1 && <Image source={PHOTOS.mount} style={s.photo} resizeMode="cover" accessibilityLabel="A phone in a dashboard mount" />}
         {step === 2 && (
           <View style={[ui.card, s.permissions]}>
             <Permission icon="map-marker-radius" title="Location" text="To find your roads, speed limits, daylight and weather." />

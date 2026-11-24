@@ -7,11 +7,11 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDi
 
 import { AdminSession as Session, AdminTripDetail as TripDetail, AdminTripRow as TripRow, getTrip, listTrips, login } from './admin-api';
 import { LoggedOut, serverUrl } from './fairdrive';
-import { DrivingRoad } from './motion';
+import { PHOTOS } from './photos';
 import { ScoredTrip } from './score';
 import { average, Avatar, NotScoredBadge, phoneName, RouteCard, ScoreBadge, sentence, when } from './trip-parts';
 import { T } from './theme';
-import { Chip, Field, IconName, PrimaryButton, ui } from './ui';
+import { Banner, Chip, Field, IconName, PrimaryButton, ui } from './ui';
 
 const WIDE = 900;
 
@@ -69,7 +69,7 @@ function Login({ onLogin, onHome }: { onLogin: (session: Session) => void; onHom
         </View>
         <Text style={ui.title}>Log in</Text>
         <Text style={ui.lead}>See every trip drivers have uploaded, with their scores and reasons.</Text>
-        <DrivingRoad kmh={30} />
+        <Banner source={PHOTOS.road} label="A small car driving down a country road" height={170} />
         <View style={ui.card}>
           <Field label="FairDrive server" value={server} onChange={setServer} placeholder="localhost:8000" keyboard="url" />
           <View style={ui.cardDivider} />

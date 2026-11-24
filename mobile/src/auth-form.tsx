@@ -4,10 +4,10 @@ import { Link } from 'expo-router';
 import { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { DrivingRoad } from './motion';
+import { PHOTOS } from './photos';
 import { Page } from './page';
 import { T } from './theme';
-import { PrimaryButton, ui } from './ui';
+import { Banner, PrimaryButton, ui } from './ui';
 
 export function AuthForm(p: {
   title: string; lead: string; fields: ReactNode; error: string; busy: boolean; ready: boolean;
@@ -18,7 +18,7 @@ export function AuthForm(p: {
       <Text style={s.brand}>FairDrive</Text>
       <Text style={ui.title}>{p.title}</Text>
       <Text style={ui.lead}>{p.lead}</Text>
-      <DrivingRoad kmh={30} />
+      <Banner source={PHOTOS.road} label="A small car driving down a country road" height={170} />
       <View style={ui.card}>{p.fields}</View>
       {p.error !== '' && <Text style={ui.error}>{p.error}</Text>}
       <PrimaryButton label={p.busy ? 'One moment…' : p.button} disabled={!p.ready || p.busy} onPress={p.onSubmit} />
