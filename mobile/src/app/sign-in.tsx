@@ -6,20 +6,19 @@ import { useSession } from '../session';
 import { Field, ui } from '../ui';
 
 export default function SignIn() {
-  const { signIn, lastServer } = useSession();
+  const { signIn } = useSession();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [server, setServer] = useState(lastServer);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const ready = email.trim() !== '' && password !== '' && server.trim() !== '';
+  const ready = email.trim() !== '' && password !== '';
 
   async function submit() {
     if (!ready || busy) return;
     setBusy(true);
     setError('');
     try {
-      await signIn(server, email, password);
+      await signIn(email, password);
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
@@ -35,8 +34,6 @@ export default function SignIn() {
         <Field label="Email" value={email} onChange={setEmail} placeholder="you@example.com" keyboard="email-address" autoComplete="email" />
         <View style={ui.cardDivider} />
         <Field label="Password" value={password} onChange={setPassword} placeholder="Your password" secret autoComplete="current-password" onSubmit={submit} />
-        <View style={ui.cardDivider} />
-        <Field label="FairDrive server" value={server} onChange={setServer} placeholder="192.168.1.20:8000" keyboard="url" />
       </>}
     />
   );

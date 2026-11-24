@@ -3,17 +3,16 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 
 import * as api from './fairdrive';
-import { LoggedOut, Session, serverUrl } from './fairdrive';
+import { LoggedOut, Session } from './fairdrive';
 import { storage } from './storage';
 
 type State = {
   ready: boolean;
   onboarded: boolean;
   session: Session | null;
-  lastServer: string;
   finishOnboarding: () => Promise<void>;
-  signIn: (server: string, email: string, password: string) => Promise<void>;
-  signUp: (server: string, name: string, email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   /** Runs an API call with the session; an expired sign-in signs the driver out instead of throwing. */
@@ -39,22 +38,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [onboarded, setOnboarded] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
-  const [lastServer, setLastServer] = useState('');
 
   useEffect(() => {
-    Promise.all([storage.get('onboarded'), storage.get('session'), storage.get('server')]).then(([seen, saved, server]) => {
+    Promise.all([storage.get('onboarded'), storage.get('session')]).then(([seen, saved]) => {
       setOnboarded(seen === 'yes');
       setSession(saved ? JSON.parse(saved) : null);
-      setLastServer(server ?? '');
       setReady(true);
     });
   }, []);
 
-  async function keep(server: string, token: string, driver: api.Driver) {
-    const next = { server, token, driver };
+  async function keep(token: string, driver: api.Driver) {
+    const next = { token, driver };
     await storage.set('session', JSON.stringify(next));
-    await storage.set('server', server);
-    setLastServer(server);
     setSession(next);
   }
 
@@ -74,20 +69,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [session, forget]);
 
   const state: State = {
-    ready, onboarded, session, lastServer,
+    ready, onboarded, session,
     finishOnboarding: async () => {
       await storage.set('onboarded', 'yes');
       setOnboarded(true);
     },
-    signIn: async (typed, email, password) => {
-      const server = serverUrl(typed);
-      const { token, driver } = await api.signIn(server, email.trim(), password);
-      await keep(server, token, driver);
+    signIn: async (email, password) => {
+      const { token, driver } = await api.signIn(email.trim(), password);
+      await keep(token, driver);
     },
-    signUp: async (typed, name, email, password) => {
-      const server = serverUrl(typed);
-      const { token, driver } = await api.signUp(server, name.trim(), email.trim(), password);
-      await keep(server, token, driver);
+    signUp: async (name, email, password) => {
+      const { token, driver } = await api.signUp(name.trim(), email.trim(), password);
+      await keep(token, driver);
     },
     signOut: async () => {
       await api.signOut(session!).catch((e) => { if (!(e instanceof LoggedOut)) throw e; });

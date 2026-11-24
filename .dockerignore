@@ -1,0 +1,9 @@
+.git
+.venv
+data
+mobile
+tests
+docs
+uah-text
+**/__pycache__
+.pytest_cache

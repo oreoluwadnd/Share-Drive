@@ -1,4 +1,4 @@
-// The Profile tab: who you are, the server, privacy, permission help, sign out and delete account.
+// The Profile tab: who you are, privacy, permission help, sign out and delete account.
 
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Constants from 'expo-constants';
@@ -29,7 +29,6 @@ export default function Profile() {
       </View>
 
       <View style={[ui.card, s.list]}>
-        <Row icon="server-network" label="FairDrive server" detail={session.server.replace(/^https?:\/\//, '')} />
         <Row icon="shield-lock-outline" label="Privacy" href="/privacy" />
         <Row icon="map-marker-radius" label="Location and motion help" href="/permissions" />
       </View>

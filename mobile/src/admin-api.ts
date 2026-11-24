@@ -2,17 +2,17 @@
 
 import { request, TripDetail, TripRow } from './fairdrive';
 
-export type AdminSession = { server: string; token: string; email: string };
+export type AdminSession = { token: string; email: string };
 export type AdminTripRow = TripRow & { driver_name: string };
 export type AdminTripDetail = TripDetail & { driver_name: string };
 
-export async function login(server: string, email: string, password: string): Promise<AdminSession> {
-  const body = await request<{ token: string; email: string }>(server, '/admin/login', { method: 'POST', body: { email, password } });
-  return { server, token: body.token, email: body.email };
+export async function login(email: string, password: string): Promise<AdminSession> {
+  const body = await request<{ token: string; email: string }>('/admin/login', { method: 'POST', body: { email, password } });
+  return { token: body.token, email: body.email };
 }
 
 export const listTrips = async (session: AdminSession) =>
-  (await request<{ trips: AdminTripRow[] }>(session.server, '/admin/trips', { token: session.token })).trips;
+  (await request<{ trips: AdminTripRow[] }>('/admin/trips', { token: session.token })).trips;
 
 export const getTrip = (session: AdminSession, tripId: string) =>
-  request<AdminTripDetail>(session.server, `/admin/trips/${tripId}`, { token: session.token });
+  request<AdminTripDetail>(`/admin/trips/${tripId}`, { token: session.token });

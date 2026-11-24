@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { AdminSession as Session, AdminTripDetail as TripDetail, AdminTripRow as TripRow, getTrip, listTrips, login } from './admin-api';
-import { LoggedOut, serverUrl } from './fairdrive';
+import { LoggedOut } from './fairdrive';
 import { PHOTOS } from './photos';
 import { ScoredTrip } from './score';
 import { average, Avatar, NotScoredBadge, phoneName, RouteCard, ScoreBadge, sentence, when } from './trip-parts';
@@ -37,21 +37,20 @@ export default function AdminApp({ onHome }: { onHome: () => void }) {
 }
 
 function Login({ onLogin, onHome }: { onLogin: (session: Session) => void; onHome: () => void }) {
-  const [server, setServer] = useState('localhost:8000');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const ready = server.trim() !== '' && email.trim() !== '' && password !== '' && !busy;
+  const ready = email.trim() !== '' && password !== '' && !busy;
 
   async function submit() {
     if (!ready) return;
     setBusy(true);
     setError('');
     try {
-      onLogin(await login(serverUrl(server), email.trim(), password));
+      onLogin(await login(email.trim(), password));
     } catch (e) {
-      setError(e instanceof TypeError ? "Can't reach the FairDrive server. Check the address and that `fairdrive api` is running." : (e as Error).message);
+      setError((e as Error).message);
       setBusy(false);
     }
   }
@@ -71,8 +70,6 @@ function Login({ onLogin, onHome }: { onLogin: (session: Session) => void; onHom
         <Text style={ui.lead}>See every trip drivers have uploaded, with their scores and reasons.</Text>
         <Banner source={PHOTOS.road} label="A small car driving down a country road" height={170} />
         <View style={ui.card}>
-          <Field label="FairDrive server" value={server} onChange={setServer} placeholder="localhost:8000" keyboard="url" />
-          <View style={ui.cardDivider} />
           <Field label="Email" value={email} onChange={setEmail} placeholder="you@example.com" keyboard="email-address" onSubmit={submit} />
           <View style={ui.cardDivider} />
           <Field label="Password" value={password} onChange={setPassword} placeholder="Your password" secret onSubmit={submit} />

@@ -1,13 +1,15 @@
-// Talks to the FairDrive API (`uv run fairdrive api` on a laptop on the same Wi-Fi). Shared by the phone app and the web dashboard.
+// Talks to the FairDrive API at API_URL (see config.ts). Shared by the phone app and the web dashboard.
 
 import { File, UploadTask, UploadType } from 'expo-file-system';
+
+import { API_URL } from './config';
 
 export type Moment = { kind: string; label: string; count: number; normal: number };
 export type Score = { driving_score: number; conditions_score: number; old_score: number; km: number; moments: Moment[] };
 export type Reasons = { driving_reasons: string[]; conditions_reasons: string[] };
 export type Phone = { device: string; platform: string } | null;
 export type Driver = { email: string; name: string; driver_id: string };
-export type Session = { server: string; token: string; driver: Driver };
+export type Session = { token: string; driver: Driver };
 
 export type TripRow = {
   trip_id: string; driver: string; start: string; distance_km: number; phone: Phone;
@@ -30,16 +32,11 @@ export type TripResult = { tripId: string; distanceKm: number } & (
 /** Thrown when the sign-in is missing or expired, so the app can go back to signing in. */
 export class LoggedOut extends Error {}
 
-export function serverUrl(typed: string): string {
-  const url = typed.trim().replace(/\/+$/, '');
-  return /^https?:\/\//.test(url) ? url : `http://${url}`;
-}
-
 /** A JSON request. `token` is sent as a bearer token; a 401 throws LoggedOut, other errors the server's message. */
-export async function request<T>(server: string, path: string, init: { method?: string; token?: string; body?: object } = {}): Promise<T> {
+export async function request<T>(path: string, init: { method?: string; token?: string; body?: object } = {}): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${server}${path}`, {
+    response = await fetch(`${API_URL}${path}`, {
       method: init.method ?? 'GET',
       headers: {
         ...(init.body ? { 'Content-Type': 'application/json' } : {}),
@@ -48,7 +45,7 @@ export async function request<T>(server: string, path: string, init: { method?: 
       body: init.body ? JSON.stringify(init.body) : undefined,
     });
   } catch {
-    throw new Error(`Can't reach the FairDrive server at ${server}. Check the address and that the phone is on the same Wi-Fi.`);
+    throw new Error(`Can't reach the FairDrive server at ${API_URL}. Check your internet connection and try again.`);
   }
   if (response.status === 204) return undefined as T;
   const body = await response.json();
@@ -57,24 +54,24 @@ export async function request<T>(server: string, path: string, init: { method?: 
   return body;
 }
 
-export const signUp = (server: string, name: string, email: string, password: string) =>
-  request<{ token: string; driver: Driver }>(server, '/auth/signup', { method: 'POST', body: { name, email, password } });
+export const signUp = (name: string, email: string, password: string) =>
+  request<{ token: string; driver: Driver }>('/auth/signup', { method: 'POST', body: { name, email, password } });
 
-export const signIn = (server: string, email: string, password: string) =>
-  request<{ token: string; driver: Driver }>(server, '/auth/login', { method: 'POST', body: { email, password } });
+export const signIn = (email: string, password: string) =>
+  request<{ token: string; driver: Driver }>('/auth/login', { method: 'POST', body: { email, password } });
 
-export const signOut = (session: Session) => request<void>(session.server, '/auth/logout', { method: 'POST', token: session.token });
+export const signOut = (session: Session) => request<void>('/auth/logout', { method: 'POST', token: session.token });
 
-export const deleteAccount = (session: Session) => request<void>(session.server, '/me', { method: 'DELETE', token: session.token });
+export const deleteAccount = (session: Session) => request<void>('/me', { method: 'DELETE', token: session.token });
 
 export const myTrips = async (session: Session) =>
-  (await request<{ trips: TripRow[] }>(session.server, '/me/trips', { token: session.token })).trips;
+  (await request<{ trips: TripRow[] }>('/me/trips', { token: session.token })).trips;
 
-export const myTrip = (session: Session, tripId: string) => request<TripDetail>(session.server, `/me/trips/${tripId}`, { token: session.token });
+export const myTrip = (session: Session, tripId: string) => request<TripDetail>(`/me/trips/${tripId}`, { token: session.token });
 
 /** Uploads the recording as the signed-in driver, then fetches each trip it became. */
 export async function sendTrip(session: Session, recording: File): Promise<TripResult[]> {
-  const upload = new UploadTask(recording, `${session.server}/trips`, {
+  const upload = new UploadTask(recording, `${API_URL}/trips`, {
     uploadType: UploadType.MULTIPART,
     fieldName: 'file',
     mimeType: 'application/json',

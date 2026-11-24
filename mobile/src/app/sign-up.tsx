@@ -7,21 +7,20 @@ import { useSession } from '../session';
 import { Field, ui } from '../ui';
 
 export default function SignUp() {
-  const { signUp, lastServer } = useSession();
+  const { signUp } = useSession();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [server, setServer] = useState(lastServer);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const ready = name.trim() !== '' && email.trim() !== '' && password !== '' && server.trim() !== '';
+  const ready = name.trim() !== '' && email.trim() !== '' && password !== '';
 
   async function submit() {
     if (!ready || busy) return;
     setBusy(true);
     setError('');
     try {
-      await signUp(server, name, email, password);
+      await signUp(name, email, password);
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
@@ -40,8 +39,6 @@ export default function SignUp() {
         <Field label="Email" value={email} onChange={setEmail} placeholder="you@example.com" keyboard="email-address" autoComplete="email" />
         <View style={ui.cardDivider} />
         <Field label="Password" value={password} onChange={setPassword} placeholder="At least 8 characters" secret autoComplete="new-password" onSubmit={submit} />
-        <View style={ui.cardDivider} />
-        <Field label="FairDrive server" value={server} onChange={setServer} placeholder="192.168.1.20:8000" keyboard="url" />
       </>}
     />
   );

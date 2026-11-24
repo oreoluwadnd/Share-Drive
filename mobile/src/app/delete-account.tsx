@@ -29,7 +29,7 @@ export default function DeleteAccount() {
   return (
     <Page edges={['top', 'bottom']}>
       <Text style={ui.title}>Delete your account</Text>
-      <Text style={ui.lead}>This deletes {session.driver.email} from {session.server.replace(/^https?:\/\//, '')}, along with:</Text>
+      <Text style={ui.lead}>This deletes the account {session.driver.email}, along with:</Text>
       <View style={[ui.card, ui.tips]}>
         <Tip text="Every trip you uploaded, with its scores and route." />
         <Tip text="Your name, email and password." />

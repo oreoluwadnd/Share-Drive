@@ -1,10 +1,10 @@
-// Small values kept on the device: the sign-in, the server address, whether onboarding was seen.
+// Small values kept on the device: the sign-in and whether onboarding was seen.
 // Phones use the secure keychain/keystore. The browser (where the screens are checked) uses localStorage.
 
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-export type Key = 'session' | 'server' | 'onboarded';
+export type Key = 'session' | 'onboarded';
 
 export const storage = Platform.OS === 'web'
   ? {
