@@ -86,6 +86,8 @@ A file that can't be used gets a 400 that names the problem. Drivers only ever s
 
 The landing page and the admin web dashboard (every trip, with scores, reasons and route) are the same Expo app opened in a browser; see `mobile/README.md`.
 
+**Deploying:** the API goes on Railway (`Dockerfile`), the landing page and admin dashboard on Vercel (`mobile/vercel.json`). Steps in `docs/deploy.md`.
+
 ## Recording a drive
 
 In Sensor Logger, switch on **Accelerometer**, **Gravity** and **Location**, and give it location access **Always** (iPhone: Settings → Sensor Logger → Location → Always, Precise on). Without location an iPhone pauses the app when the screen locks. Export the recording as **JSON**. Or record with the FairDrive phone app in `mobile/`, which sends the trip straight to the API and shows the scores (see `mobile/README.md`).

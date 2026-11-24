@@ -29,7 +29,8 @@ API_PORT = 8000
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="fairdrive")
-    parser.add_argument("--data-dir", type=Path, default=Path("data"), help="where trips are stored (default: data)")
+    parser.add_argument("--data-dir", type=Path, default=Path(os.environ.get("FAIRDRIVE_DATA", "data")),
+                        help="where trips and accounts are stored (default: $FAIRDRIVE_DATA, else data)")
     commands = parser.add_subparsers(dest="command", required=True)
 
     upload_cmd = commands.add_parser("upload", help="upload a Sensor Logger JSON export")
