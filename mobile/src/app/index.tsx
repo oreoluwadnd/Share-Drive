@@ -8,6 +8,6 @@ import { useSession } from '../session';
 
 export default function Start() {
   const { onboarded, session } = useSession();
-  if (Platform.OS === 'web') return <Landing onAdmin={() => router.push('/admin')} />;
+  if (Platform.OS === 'web') return <Landing onLogin={() => router.push('/admin')} />;
   return <Redirect href={!onboarded ? '/onboarding' : session === null ? '/sign-in' : '/drive'} />;
 }
