@@ -134,8 +134,8 @@ def add_trip(file: UploadFile, driver: dict = Depends(_driver)) -> dict:
         tag_all(store)
     except urllib.error.HTTPError as error:
         # Saved but not tagged: the next upload (or `fairdrive tag` on the server) finishes it.
-        raise HTTPException(502, "Your drive was saved, but the map or weather service isn't answering right now, so it can't be "
-                                 "scored yet. It will be scored once they answer. You'll find it under Trips.")
+        raise HTTPException(502, "Your drive was saved, but the map or weather service didn't answer, so it can't be scored yet. "
+                                 "FairDrive tries again each time a drive is sent. You'll find it under Trips.")
     trips = store.list().set_index("trip_id").loc[trip_ids]
     return {"trips": [{"trip_id": t, "distance_km": float(row["distance_km"]), "flag": row["flag"]} for t, row in trips.iterrows()]}
 

@@ -1,6 +1,7 @@
 // How to turn on location and motion. Opened when a drive can't start, and from Profile.
 
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Linking, Platform, StyleSheet, Text, View } from 'react-native';
 
@@ -8,7 +9,8 @@ import { Page } from '../page';
 import { T } from '../theme';
 import { IconName, PrimaryButton, SecondaryButton, ui } from '../ui';
 
-const APP = 'FairDrive';
+// Inside Expo Go the phone lists these permissions under Expo Go, not FairDrive.
+const APP = Constants.executionEnvironment === ExecutionEnvironment.StoreClient ? 'Expo Go' : 'FairDrive';
 const STEPS = Platform.OS === 'ios'
   ? {
       location: [`Open Settings → ${APP} → Location.`, 'Choose "While Using the App" and turn on Precise Location.'],
