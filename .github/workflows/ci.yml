@@ -1,5 +1,6 @@
-# Checks every pull request. On main, deploys the API to Railway and then the web app to Vercel,
-# only if every check passed. Setup (tokens, IDs, the API address): docs/deploy.md.
+# Checks every pull request. On main, deploys the web app to Vercel once every check passed.
+# The API is deployed by Railway itself from main, with "Wait for CI" on: it waits for this whole
+# workflow, Vercel deploy included, to succeed. Setup: docs/deploy.md.
 name: CI
 
 on:
@@ -41,29 +42,10 @@ jobs:
         env:
           EXPO_PUBLIC_API_URL: https://api.example.invalid
 
-  deploy-api:
-    name: Deploy API to Railway
-    needs: [api-tests, app-checks]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    concurrency:
-      group: deploy-api
-    env:
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-      RAILWAY_SERVICE: ${{ vars.RAILWAY_SERVICE }}
-    steps:
-      - name: Check the Railway settings are in GitHub
-        run: |
-          test -n "$RAILWAY_TOKEN" || { echo "::error::Add the RAILWAY_TOKEN secret (see docs/deploy.md)"; exit 1; }
-          test -n "$RAILWAY_SERVICE" || { echo "::error::Add the RAILWAY_SERVICE variable (see docs/deploy.md)"; exit 1; }
-      - uses: actions/checkout@v7
-      - run: npm install --global @railway/cli@5.75.0
-      # Uploads the repository; Railway builds the Dockerfile and waits for the deploy. Fails the job if it fails.
-      - run: railway up --ci --service "$RAILWAY_SERVICE"
-
   deploy-web:
     name: Deploy web app to Vercel
-    needs: [deploy-api]
+    needs: [api-tests, app-checks]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-web

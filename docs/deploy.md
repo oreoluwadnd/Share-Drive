@@ -8,30 +8,29 @@
 
 ## How deploys happen
 
-GitHub Actions (`.github/workflows/ci.yml`) is the only thing that deploys:
+GitHub Actions (`.github/workflows/ci.yml`) runs the checks:
 
 - **Every pull request:** API tests, app typecheck, and a web build. Nothing is deployed.
-- **Every push to `main`** (a merged pull request): the same checks, then, only if all pass, the API goes to Railway, then the web app to Vercel.
+- **Every push to `main`** (a merged pull request): the same checks, then, only if all pass, the web app is deployed to Vercel.
+- **The API:** Railway watches `main` itself. With **Wait for CI** on, it deploys only after the whole workflow succeeds. A failed check, or a failed Vercel deploy, means no API deploy either.
 
-So don't connect Railway or Vercel to the GitHub repository. If you do, they deploy on their own as well, skipping the checks.
+Don't connect Vercel to the GitHub repository: it would deploy on its own as well, skipping the checks.
 
-The one-time setup below makes the accounts and gives GitHub the tokens. Add GitHub secrets and variables under the repository's **Settings → Secrets and variables → Actions**.
+Add GitHub secrets under the repository's **Settings → Secrets and variables → Actions**.
 
 ## 1. Railway (API)
 
-1. railway.com → **New Project** → **Empty Project** → **+ Create** → **Empty Service**. Don't pick "GitHub repo". Note the service's name, for example `fairdrive-api`.
-2. Service → **Variables** → add `PORT` = `8000`.
+1. railway.com → **New Project** → **Deploy from GitHub repo** → pick this repository. Railway finds the `Dockerfile`.
+2. Service → **Settings → Source**:
+   - **Branch connected to production**: `main`.
+   - Turn on **Wait for CI**, and accept Railway's updated GitHub permissions when it asks. Without it, Railway deploys even when tests fail.
 3. Add a **volume** to the service with mount path **`/data`**. Accounts, sign-ins and trips live there. Without it they are lost on every deploy.
 4. Service → **Settings**:
-   - **Networking** → **Generate Domain**, port `8000`. Note the address, for example `https://fairdrive-api.up.railway.app`.
+   - **Networking** → **Generate Domain**, on the port the deploy log shows (`Uvicorn running on http://0.0.0.0:8080` means `8080`; Railway sets `PORT` itself). Note the address, for example `https://share-drive-production.up.railway.app`.
    - **Healthcheck path**: `/docs`.
    - Keep **1 replica**. Accounts and sign-ins are files with in-process locks, so two copies would clash.
-5. **Project Settings → Tokens** → create a token for the `production` environment.
-6. In GitHub:
-   - secret `RAILWAY_TOKEN` = that token
-   - variable `RAILWAY_SERVICE` = the service's name
 
-The first deploy happens on the next push to `main`. Check it worked: `https://<your address>/docs` shows the API documentation.
+Check it worked: `https://<your address>/docs` shows the API documentation.
 
 ### Admin account and the UAH-DriveSet trips (once, after the first deploy)
 
@@ -79,8 +78,8 @@ The API address is built into the site, so after changing `EXPO_PUBLIC_API_URL`,
 Open the failed run under the repository's **Actions** tab:
 
 - **"Add the … secret"**: a secret or variable from the steps above is missing.
-- **Deploy API to Railway**: the job shows Railway's build log.
-- **Deploy web app to Vercel** only runs after the API deployed, so the site never points at an API that failed to deploy.
+- **The API didn't update:** Railway waits for the whole workflow. If any job failed (the Vercel deploy too), Railway skips that commit. Fix the failed job, then push again or re-run the workflow.
+- **The API failed to build or start:** see the service's **Deployments** in Railway.
 
 ## 3. Phone app
 

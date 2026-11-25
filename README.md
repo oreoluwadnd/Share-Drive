@@ -86,7 +86,7 @@ A file that can't be used gets a 400 that names the problem. Drivers only ever s
 
 The landing page and the admin web dashboard (every trip, with scores, reasons and route) are the same Expo app opened in a browser; see `mobile/README.md`.
 
-**Deploying:** GitHub Actions (`.github/workflows/ci.yml`) checks every pull request, and on `main` deploys the API to Railway (`Dockerfile`) and the landing page and admin dashboard to Vercel (`mobile/vercel.json`). One-time setup in `docs/deploy.md`.
+**Deploying:** GitHub Actions (`.github/workflows/ci.yml`) checks every pull request, and on `main` deploys the landing page and admin dashboard to Vercel (`mobile/vercel.json`). Railway deploys the API (`Dockerfile`) from `main` once the workflow has passed. One-time setup in `docs/deploy.md`.
 
 ## Recording a drive
 
