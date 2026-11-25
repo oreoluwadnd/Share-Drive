@@ -133,8 +133,9 @@ def add_trip(file: UploadFile, driver: dict = Depends(_driver)) -> dict:
     try:
         tag_all(store)
     except urllib.error.HTTPError as error:
-        raise HTTPException(502, f"Trip(s) {', '.join(trip_ids)} saved, but the map or weather server answered {error.code}. "
-                                 "Run `fairdrive tag` later to finish them.")
+        # Saved but not tagged: the next upload (or `fairdrive tag` on the server) finishes it.
+        raise HTTPException(502, "Your drive was saved, but the map or weather service didn't answer, so it can't be scored yet. "
+                                 "FairDrive tries again each time a drive is sent. You'll find it under Trips.")
     trips = store.list().set_index("trip_id").loc[trip_ids]
     return {"trips": [{"trip_id": t, "distance_km": float(row["distance_km"]), "flag": row["flag"]} for t, row in trips.iterrows()]}
 
@@ -249,9 +250,9 @@ def _why_not_scored(details: dict) -> str:
     if details["flag"]:
         return details["flag"]
     if not is_tagged(details):
-        return "it still needs road, time and weather (run `fairdrive tag`)"
+        return "FairDrive is still looking up the road, time and weather for this drive. Check back later"
     if _scores().empty:
-        return "FairDrive needs tagged trips from at least 2 drivers before it can score any"
+        return "FairDrive needs drives from at least 2 drivers before it can score any"
     return "less than 1 km is left once 500 m is hidden at each end. Drive at least 3 km"
 
 

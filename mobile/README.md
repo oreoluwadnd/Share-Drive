@@ -15,7 +15,7 @@ Recordings use Sensor Logger's JSON format, so FairDrive reads them unchanged.
 
 1. On the laptop, in the repository: `uv run fairdrive api`. Note the laptop's Wi-Fi address (Mac: System Settings → Wi-Fi → Details; Windows: `ipconfig`), for example `192.168.1.20`.
 2. Install **Expo Go** on the phone (App Store or Play Store). Phone and laptop on the same Wi-Fi.
-3. In `mobile/`: copy `.env.example` to `.env` and set `EXPO_PUBLIC_API_URL` to the API, e.g. `http://192.168.1.20:8000` (or the deployed Railway address). The address is built into the app, so restart `npx expo start` after changing it.
+3. The app talks to the API on Railway (`https://share-drive-production.up.railway.app`, set in `src/config.ts`), so the phone only needs internet. To use an API on your laptop instead, change that line to the laptop's Wi-Fi address, for example `http://192.168.1.20:8000`.
 4. On the laptop, in `mobile/`: `npm install`, then `npx expo start`. Scan the QR code with the phone camera (iPhone) or Expo Go (Android).
 5. In the app: go through the three intro screens, then **Create account** with your name, email and a password. Then **Start drive**, and allow location and motion when asked.
 
@@ -26,7 +26,7 @@ The app stays signed in on the phone (stored in the phone's secure storage) unti
 1. Make an admin account (once), in the repository: `uv run fairdrive add-admin you@example.com`. It asks for a password (at least 8 characters).
 2. Start the API: `uv run fairdrive api`.
 3. In `mobile/`: `npx expo start --web`, or press `w` in a running `npx expo start`. It opens in the browser.
-4. Log in with your email and password. The dashboard talks to the API in `EXPO_PUBLIC_API_URL` (`http://localhost:8000` when the API runs on the same laptop).
+4. Log in with your email and password. The dashboard talks to the same API as the phone app (`src/config.ts`).
 
 ## Code
 

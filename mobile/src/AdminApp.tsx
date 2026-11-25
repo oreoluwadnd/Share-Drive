@@ -76,7 +76,7 @@ function Login({ onLogin, onHome }: { onLogin: (session: Session) => void; onHom
         </View>
         {error !== '' && <Text style={ui.error}>{error}</Text>}
         <PrimaryButton label={busy ? 'Logging in…' : 'Log in'} disabled={!ready} onPress={submit} />
-        <Text style={[ui.muted, ui.centerText]}>No account? An admin is added on the server with{'\n'}uv run fairdrive add-admin you@example.com</Text>
+        <Text style={[ui.muted, ui.centerText]}>No account? Ask the FairDrive team to add you as an admin.</Text>
       </View>
     </ScrollView>
   );

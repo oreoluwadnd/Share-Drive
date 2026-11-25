@@ -33,7 +33,7 @@ yarn-error.*
 # Vercel CLI link (vercel link / vercel pull)
 .vercel
 
-# local env files (copy .env.example to .env)
+# local env files
 .env
 .env*.local
 
