@@ -52,7 +52,7 @@ def main(argv: list[str] | None = None) -> None:
     commands.add_parser("leakage", help="does the driving score give away the road type or darkness?")
     commands.add_parser("phones", help="sensor noise and score spread per phone model")
     commands.add_parser("dashboard", help="open the dashboard in the browser")
-    admin_cmd = commands.add_parser("add-admin", help="create an admin account for the web dashboard (asks for a password)")
+    admin_cmd = commands.add_parser("add-admin", help="create a FairDrive super admin for the web dashboard: approves companies, sees everything (asks for a password)")
     admin_cmd.add_argument("email")
     commands.add_parser("api", help=f"serve scores on port {API_PORT} to this computer and phones on the same Wi-Fi (docs at /docs)")
 
@@ -125,10 +125,10 @@ def main(argv: list[str] | None = None) -> None:
         if getpass("Same password again: ") != password:
             sys.exit("error: the passwords didn't match. No admin was added.")
         try:
-            Accounts(args.data_dir / "admins.json").add(args.email, password)
+            Accounts(args.data_dir / "staff.json").add(args.email, password, role="super", company_id=None)
         except ValueError as error:
             sys.exit(f"error: {error}")
-        print(f"Added admin {args.email.strip().lower()}")
+        print(f"Added super admin {args.email.strip().lower()}")
     elif args.command == "api":
         env = {**os.environ, "FAIRDRIVE_DATA": str(args.data_dir.resolve())}
         subprocess.run([sys.executable, "-m", "uvicorn", "fairdrive.api:app", "--host", "0.0.0.0", "--port", str(API_PORT)], env=env, check=True)

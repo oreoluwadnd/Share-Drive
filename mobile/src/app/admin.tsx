@@ -1,7 +1,8 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
 import AdminApp from '../AdminApp';
 
 export default function Admin() {
-  return <AdminApp onHome={() => router.replace('/')} />;
+  const { invite } = useLocalSearchParams<{ invite?: string }>();
+  return <AdminApp onHome={() => router.replace('/')} inviteCode={invite} onInviteUsed={() => router.setParams({ invite: undefined })} />;
 }

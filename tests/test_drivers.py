@@ -3,7 +3,7 @@
 import pytest
 
 from fairdrive.sessions import Sessions
-from tests.conftest import PASSWORD, add_tagged_trip, admin_headers, sign_up
+from tests.conftest import PASSWORD, add_company, add_tagged_trip, admin_headers, sign_up
 
 
 @pytest.fixture
@@ -24,10 +24,13 @@ def test_sign_up_then_sign_in(client):
     ({"name": "Ben", "email": "ben", "password": PASSWORD}, 400, "valid email"),
     ({"name": "Ben", "email": "ben@example.com", "password": "short"}, 400, "at least 8"),
     ({"name": "Ana again", "email": "ana@example.com", "password": PASSWORD}, 409, "Sign in instead"),
+    ({"name": "Ben", "email": "ben@example.com", "password": PASSWORD, "company_id": "c-made-up"}, 400, "insurance company"),
+    ({"name": "Ben", "email": "ben@example.com", "password": PASSWORD, "company_id": "c-waiting"}, 400, "insurance company"),
 ])
 def test_sign_up_problems_are_explained(client, form, status, message):
     sign_up(client, "Ana")
-    response = client.post("/auth/signup", json=form)
+    add_company("Waiting Mutual", status="pending")
+    response = client.post("/auth/signup", json={"company_id": add_company()} | form)
     assert response.status_code == status and message in response.json()["detail"]
 
 
@@ -51,7 +54,16 @@ def test_sessions_survive_a_restart_and_tokens_are_not_stored(client, store):
     token = ana["headers"]["Authorization"].removeprefix("Bearer ")
     assert token not in (store.root / "sessions.json").read_text()
     assert Sessions(store.root / "sessions.json").who(token, "driver") == "ana@example.com"  # a fresh server reads the file
-    assert Sessions(store.root / "sessions.json").who(token, "admin") is None
+    assert Sessions(store.root / "sessions.json").who(token, "staff") is None
+
+
+def test_sign_up_lists_only_approved_companies(client):
+    add_company("Waiting Mutual", status="pending")
+    add_company("Acme Insurance")
+    add_company("Beta Cover")
+    assert client.get("/companies").json()["companies"] == [
+        {"company_id": "c-acme", "name": "Acme Insurance"}, {"company_id": "c-beta", "name": "Beta Cover"}]
+    assert sign_up(client, "Ana", "c-beta")["driver"]["company_id"] == "c-beta"
 
 
 def test_an_admin_token_is_not_a_driver_token(client):

@@ -1,4 +1,4 @@
-"""Admin accounts and the admin endpoints the web dashboard uses."""
+"""Staff accounts, and what a FairDrive super admin sees on the web dashboard. Companies and teams: test_companies.py."""
 
 import pytest
 
@@ -11,7 +11,7 @@ from tests.conftest import PASSWORD, sign_up
 def client(store, make_client):
     from fairdrive import api
     client = make_client(store)
-    api.admins.add("ana@example.com", PASSWORD)
+    api.staff.add("ana@example.com", PASSWORD, role="super", company_id=None)
     return client
 
 
@@ -23,16 +23,16 @@ def login(client) -> dict:
 # Accounts
 
 def test_password_is_stored_hashed_and_checked(tmp_path):
-    accounts = Accounts(tmp_path / "admins.json")
+    accounts = Accounts(tmp_path / "staff.json")
     accounts.add("Ana@Example.com", PASSWORD)
-    assert PASSWORD not in (tmp_path / "admins.json").read_text()
+    assert PASSWORD not in (tmp_path / "staff.json").read_text()
     assert accounts.check("ana@example.com", PASSWORD)  # email case doesn't matter
     assert not accounts.check("ana@example.com", "wrong password")
     assert not accounts.check("ben@example.com", PASSWORD)
 
 
 def test_duplicate_admin_and_short_password_are_refused(tmp_path):
-    accounts = Accounts(tmp_path / "admins.json")
+    accounts = Accounts(tmp_path / "staff.json")
     accounts.add("ana@example.com", PASSWORD)
     with pytest.raises(ValueError, match="already"):
         accounts.add("ana@example.com", PASSWORD)
@@ -43,7 +43,7 @@ def test_duplicate_admin_and_short_password_are_refused(tmp_path):
 def test_cli_adds_an_admin(tmp_path, monkeypatch):
     monkeypatch.setattr("fairdrive.cli.getpass", lambda prompt: PASSWORD)
     main(["--data-dir", str(tmp_path), "add-admin", "ben@example.com"])
-    assert Accounts(tmp_path / "admins.json").check("ben@example.com", PASSWORD)
+    assert Accounts(tmp_path / "staff.json").check("ben@example.com", PASSWORD)["role"] == "super"
 
 
 def test_cli_refuses_passwords_that_dont_match(tmp_path, monkeypatch):
@@ -67,7 +67,7 @@ def test_admin_endpoints_need_a_login(client, store):
     assert client.get("/admin/trips", headers={"Authorization": "Bearer made-up"}).status_code == 401
 
 
-def test_trip_list_has_every_trip_with_scores(client, store):
+def test_super_admin_trip_list_has_every_trip_with_scores(client, store):
     trips = client.get("/admin/trips", headers=login(client)).json()["trips"]
     assert len(trips) == len(store.list()) == 36
     first = trips[0]
@@ -120,7 +120,7 @@ def lonely_client(tmp_path, make_client):
     from fairdrive.store import TripStore
     store = TripStore(tmp_path / "data")
     client = make_client(store)
-    api.admins.add("ana@example.com", PASSWORD)
+    api.staff.add("ana@example.com", PASSWORD, role="super", company_id=None)
     return client, store
 
 

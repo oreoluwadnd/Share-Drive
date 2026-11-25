@@ -3,7 +3,7 @@
 | Part | Where | Cost |
 |---|---|---|
 | API (`Dockerfile` in the repo root) | Railway | Hobby plan, about $5 a month |
-| Landing page and admin dashboard (`mobile/`) | Vercel | Free (Hobby) |
+| Landing page and dashboard (`mobile/`) | Vercel | Free (Hobby) |
 | Phone app (`mobile/`) | Expo Go for testing, EAS Build to install | Free for Android; iPhone needs an Apple Developer account ($99 a year) |
 
 ## How deploys happen
@@ -53,12 +53,14 @@ fairdrive load-uah /data/uah-text/UAH-DRIVESET-v1
 fairdrive tag                              # road, time and weather; takes a few minutes
 fairdrive summary                          # expect 6 drivers
 rm -rf /data/uah-text /data/uah-text.tgz   # the raw files aren't needed any more
-fairdrive add-admin you@example.com        # asks for a password
+fairdrive add-admin you@example.com        # the FairDrive super admin; asks for a password
 ```
 
 On the server, `fairdrive` commands use `/data` by themselves (the image sets `FAIRDRIVE_DATA=/data`). If `uah-text.tgz` isn't in `/data`, `railway volume browse` shows where the upload went.
 
-## 2. Vercel (landing page and admin dashboard)
+The super admin approves insurance companies under **Companies** on the dashboard. Super admins live in `/data/staff.json`; an account made before companies existed (in `/data/admins.json`) no longer logs in, so run `fairdrive add-admin` again.
+
+## 2. Vercel (landing page and dashboard)
 
 1. On your laptop, in `mobile/`: `npx vercel@66.6.0 link`, and create a new project when asked. This makes the project without connecting GitHub, and writes `mobile/.vercel/project.json` (git ignores it).
 2. Copy `orgId` and `projectId` from `mobile/.vercel/project.json`.
@@ -91,6 +93,7 @@ Open the failed run under the repository's **Actions** tab:
 
 ## Before real drivers use it
 
-- The admin dashboard and API are public on the internet. Use a long admin password.
+- The dashboard and API are public on the internet. Use a long super admin password.
+- Anyone can sign up a company, but nobody from it can log in, and drivers can't choose it, until a super admin approves it.
 - There is no password reset by email yet.
 - Scores are recomputed for every trip whenever a trip is added. That's fine for a class project, but it slows down with hundreds of drivers.

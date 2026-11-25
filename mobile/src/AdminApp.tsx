@@ -1,46 +1,103 @@
-// The web dashboard: the FairDrive team logs in and sees every trip uploaded to FairDrive.
-// Same brand as the landing page (src/brand.ts): warm paper, FairDrive green, flat colours, hairline borders.
+// The web dashboard. Insurance companies sign up here and wait for the FairDrive team to approve them; then their owner
+// and team see their own drivers' trips. The FairDrive team (super admins) sees everything and approves companies.
 
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
-import { AdminSession as Session, AdminTripDetail as TripDetail, AdminTripRow as TripRow, getTrip, listTrips, login } from './admin-api';
-import { C, FONT, text as f, useBrandFonts } from './brand';
+import {
+  acceptInvite, Account, AdminSession as Session, AdminTripDetail as TripDetail, AdminTripRow as TripRow,
+  getInvite, getTrip, listTrips, login, signUpCompany,
+} from './admin-api';
+import { CompaniesPage, DriversPage, TeamPage, useLoad } from './admin-pages';
+import { Button, FilterChip, Input, s, Stat, TextLink, WIDE, Wordmark } from './admin-ui';
+import { C, useBrandFonts } from './brand';
 import { LoggedOut } from './fairdrive';
 import { ScoredTrip } from './score';
 import { average, Avatar, NotScoredBadge, phoneName, RouteCard, ScoreBadge, sentence, when } from './trip-parts';
 
-const WIDE = 900;
+type Tab = 'trips' | 'drivers' | 'team' | 'companies';
+const TAB_LABELS: Record<Tab, string> = { trips: 'Trips', drivers: 'Drivers', team: 'Team', companies: 'Companies' };
 
-export default function AdminApp({ onHome }: { onHome: () => void }) {
+/** inviteCode: from a team invite link (/admin?invite=CODE). onInviteUsed clears it once the person has joined. */
+export default function AdminApp({ onHome, inviteCode, onInviteUsed }: { onHome: () => void; inviteCode?: string; onInviteUsed: () => void }) {
   const fontsReady = useBrandFonts();
   const [session, setSession] = useState<Session | null>(null);
+  const [tab, setTab] = useState<Tab>('trips');
   const [openTrip, setOpenTrip] = useState<string | null>(null);
-  const logOut = () => { setSession(null); setOpenTrip(null); };
+  const logOut = () => { setSession(null); setOpenTrip(null); setTab('trips'); };
   if (!fontsReady) return <View style={s.root} />;
 
-  if (!session) return <Login onLogin={setSession} onHome={onHome} />;
+  if (!session) {
+    if (inviteCode) return <Join code={inviteCode} onJoined={(next) => { onInviteUsed(); setSession(next); }} onHome={onHome} />;
+    return <LoggedOutPages onLogin={setSession} onHome={onHome} />;
+  }
+  const { account } = session;
+  const tabs: Tab[] = ['trips', 'drivers', ...(account.role === 'owner' ? ['team' as const] : []), ...(account.role === 'super' ? ['companies' as const] : [])];
+  const show = (next: Tab) => { setTab(next); setOpenTrip(null); };
+
   return (
     <View style={s.root}>
       <ScrollView stickyHeaderIndices={[0]}>
-        <TopBar email={session.email} onLogOut={logOut} onHome={onHome} />
+        <TopBar account={account} tabs={tabs} tab={tab} onTab={show} onLogOut={logOut} onHome={onHome} />
         <View style={[s.content, s.page]}>
-          {openTrip
+          {tab === 'trips' && (openTrip
             ? <TripPage session={session} tripId={openTrip} onBack={() => setOpenTrip(null)} onLoggedOut={logOut} />
-            : <TripsPage session={session} onOpen={setOpenTrip} onLoggedOut={logOut} />}
+            : <TripsPage session={session} onOpen={setOpenTrip} onLoggedOut={logOut} />)}
+          {tab === 'drivers' && <DriversPage session={session} onLoggedOut={logOut} />}
+          {tab === 'team' && <TeamPage session={session} onLoggedOut={logOut} />}
+          {tab === 'companies' && <CompaniesPage session={session} onLoggedOut={logOut} />}
         </View>
       </ScrollView>
     </View>
   );
 }
 
-function Login({ onLogin, onHome }: { onLogin: (session: Session) => void; onHome: () => void }) {
+// Before logging in
+
+/** The green panel on the left (or on top, on a phone) and a form beside it. */
+function AuthFrame({ title, lead, onHome, children }: { title: string; lead: string; onHome: () => void; children: ReactNode }) {
+  const wide = useWindowDimensions().width >= WIDE;
+  return (
+    <ScrollView style={s.root} contentContainerStyle={[s.loginPage, wide && s.row]}>
+      <View style={[s.loginPanel, wide && s.loginPanelWide]}>
+        <Pressable onPress={onHome}><Wordmark light /></Pressable>
+        <View style={s.loginPanelText}>
+          <Text style={[s.h1, !wide && s.h1Narrow, s.onGreen]}>{title}</Text>
+          <Text style={[s.lead, s.onGreenMuted]}>{lead}</Text>
+        </View>
+      </View>
+      <View style={[s.loginForm, wide && s.loginFormWide]}>
+        <View style={s.form}>{children}</View>
+      </View>
+    </ScrollView>
+  );
+}
+
+const DASHBOARD_LEAD = "Your drivers' scores, the reasons behind them and the route of every drive.";
+const SIGN_UP_TITLE = 'Bring FairDrive to your customers';
+const SIGN_UP_LEAD = 'Sign up your insurance company. Once the FairDrive team approves it, your customers can choose you in the FairDrive app and you see their scores here.';
+
+function LoggedOutPages({ onLogin, onHome }: { onLogin: (session: Session) => void; onHome: () => void }) {
+  const [page, setPage] = useState<'login' | 'signup' | { company: string; email: string }>('login');
+  if (page === 'login') return <Login onLogin={onLogin} onSignUp={() => setPage('signup')} onHome={onHome} />;
+  if (page === 'signup') return <CompanySignUp onDone={setPage} onLogin={() => setPage('login')} onHome={onHome} />;
+  return (
+    <AuthFrame title={SIGN_UP_TITLE} lead={SIGN_UP_LEAD} onHome={onHome}>
+      <Text style={s.h2}>Thanks, {page.company} is signed up</Text>
+      <Text style={s.body}>
+        The FairDrive team will review it. Once it's approved, log in with {page.email}, and your customers can choose {page.company} in the FairDrive app.
+      </Text>
+      <Button label="Back to log in" onPress={() => setPage('login')} />
+    </AuthFrame>
+  );
+}
+
+function Login({ onLogin, onSignUp, onHome }: { onLogin: (session: Session) => void; onSignUp: () => void; onHome: () => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const wide = useWindowDimensions().width >= WIDE;
   const ready = email.trim() !== '' && password !== '' && !busy;
 
   async function submit() {
@@ -56,64 +113,138 @@ function Login({ onLogin, onHome }: { onLogin: (session: Session) => void; onHom
   }
 
   return (
-    <ScrollView style={s.root} contentContainerStyle={[s.loginPage, wide && s.row]}>
-      <View style={[s.loginPanel, wide && s.loginPanelWide]}>
-        <Pressable onPress={onHome}><Wordmark light /></Pressable>
-        <View style={s.loginPanelText}>
-          <Text style={[s.h1, !wide && s.h1Narrow, s.onGreen]}>The FairDrive dashboard</Text>
-          <Text style={[s.lead, s.onGreenMuted]}>Every drive uploaded to FairDrive, with both scores, the reasons behind them and the route.</Text>
-        </View>
+    <AuthFrame title="The FairDrive dashboard" lead={DASHBOARD_LEAD} onHome={onHome}>
+      <Text style={s.h2}>Log in</Text>
+      <Input label="Email" value={email} onChange={setEmail} placeholder="you@company.com" kind="email" onSubmit={submit} />
+      <Input label="Password" value={password} onChange={setPassword} placeholder="Your password" kind="password" onSubmit={submit} />
+      {error !== '' && <Text style={s.error}>{error}</Text>}
+      <Button label={busy ? 'Logging in…' : 'Log in'} disabled={!ready} onPress={submit} />
+      <View style={s.inlineRow}>
+        <Text style={s.muted}>New insurance company?</Text>
+        <TextLink label="Sign up your company" onPress={onSignUp} />
       </View>
-
-      <View style={[s.loginForm, wide && s.loginFormWide]}>
-        <View style={s.form}>
-          <Text style={s.h2}>Log in</Text>
-          <Input label="Email" value={email} onChange={setEmail} placeholder="you@example.com" email onSubmit={submit} />
-          <Input label="Password" value={password} onChange={setPassword} placeholder="Your password" secret onSubmit={submit} />
-          {error !== '' && <Text style={s.error}>{error}</Text>}
-          <Button label={busy ? 'Logging in…' : 'Log in'} disabled={!ready} onPress={submit} />
-          <Text style={s.muted}>No account? Ask the FairDrive team to add you.</Text>
-          <TextLink label="Back to the FairDrive site" onPress={onHome} />
-        </View>
-      </View>
-    </ScrollView>
+      <TextLink label="Back to the FairDrive site" onPress={onHome} />
+    </AuthFrame>
   );
 }
 
-function TopBar({ email, onLogOut, onHome }: { email: string; onLogOut: () => void; onHome: () => void }) {
+function CompanySignUp({ onDone, onLogin, onHome }: {
+  onDone: (done: { company: string; email: string }) => void; onLogin: () => void; onHome: () => void;
+}) {
+  const [company, setCompany] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const ready = [company, name, email].every((v) => v.trim() !== '') && password !== '' && !busy;
+
+  async function submit() {
+    if (!ready) return;
+    setBusy(true);
+    setError('');
+    try {
+      const { company: made } = await signUpCompany(company.trim(), name.trim(), email.trim(), password);
+      onDone({ company: made.name, email: email.trim().toLowerCase() });
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <AuthFrame title={SIGN_UP_TITLE} lead={SIGN_UP_LEAD} onHome={onHome}>
+      <Text style={s.h2}>Sign up your company</Text>
+      <Input label="Company name" value={company} onChange={setCompany} placeholder="Acme Insurance" kind="organization" onSubmit={submit} />
+      <Input label="Your name" value={name} onChange={setName} placeholder="Ana Silva" kind="name" onSubmit={submit} />
+      <Input label="Work email" value={email} onChange={setEmail} placeholder="you@company.com" kind="email" onSubmit={submit} />
+      <Input label="Password" value={password} onChange={setPassword} placeholder="At least 8 characters" kind="new-password" onSubmit={submit} />
+      {error !== '' && <Text style={s.error}>{error}</Text>}
+      <Button label={busy ? 'Signing up…' : 'Sign up company'} disabled={!ready} onPress={submit} />
+      <View style={s.inlineRow}>
+        <Text style={s.muted}>Already approved?</Text>
+        <TextLink label="Log in" onPress={onLogin} />
+      </View>
+    </AuthFrame>
+  );
+}
+
+function Join({ code, onJoined, onHome }: { code: string; onJoined: (session: Session) => void; onHome: () => void }) {
+  const [invite, setInvite] = useState<{ email: string; company: string } | null>(null);
+  const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const ready = invite !== null && name.trim() !== '' && password !== '' && !busy;
+
+  useEffect(() => { getInvite(code).then(setInvite).catch((e) => setError((e as Error).message)); }, [code]);
+
+  async function submit() {
+    if (!ready) return;
+    setBusy(true);
+    setError('');
+    try {
+      onJoined(await acceptInvite(code, name.trim(), password));
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <AuthFrame title="The FairDrive dashboard" lead={DASHBOARD_LEAD} onHome={onHome}>
+      {invite === null && error === '' && <ActivityIndicator color={C.ink} />}
+      {invite !== null && (
+        <>
+          <Text style={s.h2}>Join {invite.company}</Text>
+          <Text style={s.muted}>You were invited as {invite.email}. Choose a password to finish.</Text>
+          <Input label="Your name" value={name} onChange={setName} placeholder="Ana Silva" kind="name" onSubmit={submit} />
+          <Input label="Password" value={password} onChange={setPassword} placeholder="At least 8 characters" kind="new-password" onSubmit={submit} />
+        </>
+      )}
+      {error !== '' && <Text style={s.error}>{error}</Text>}
+      {invite !== null && <Button label={busy ? 'Joining…' : 'Join team'} disabled={!ready} onPress={submit} />}
+      <TextLink label="Back to the FairDrive site" onPress={onHome} />
+    </AuthFrame>
+  );
+}
+
+// Logged in
+
+function TopBar({ account, tabs, tab, onTab, onLogOut, onHome }: {
+  account: Account; tabs: Tab[]; tab: Tab; onTab: (tab: Tab) => void; onLogOut: () => void; onHome: () => void;
+}) {
   const wide = useWindowDimensions().width >= WIDE;
   return (
     <View style={s.topBar}>
       <View style={[s.content, s.topRow]}>
         <Pressable onPress={onHome} style={s.brandRow}>
           <Wordmark />
-          <Text style={s.section}>Dashboard</Text>
+          {wide && <Text style={s.section}>{account.company?.name ?? 'FairDrive team'}</Text>}
         </Pressable>
         <View style={s.topRight}>
-          {wide && <Text style={s.muted}>{email}</Text>}
+          {wide && <Text style={s.muted}>{account.email}</Text>}
           <Button label="Log out" outline small onPress={onLogOut} />
         </View>
+      </View>
+      <View style={[s.content, s.tabRow]}>
+        {tabs.map((t) => (
+          <Pressable key={t} onPress={() => onTab(t)} style={[s.tab, t === tab && s.tabActive]}>
+            {({ hovered }: { pressed: boolean; hovered?: boolean }) => (
+              <Text style={[s.tabText, (t === tab || hovered) && s.tabTextActive]}>{TAB_LABELS[t]}</Text>
+            )}
+          </Pressable>
+        ))}
       </View>
     </View>
   );
 }
 
 function TripsPage({ session, onOpen, onLoggedOut }: { session: Session; onOpen: (id: string) => void; onLoggedOut: () => void }) {
-  const [trips, setTrips] = useState<TripRow[] | null>(null);
-  const [error, setError] = useState('');
+  const { data: trips, error, reload } = useLoad(() => listTrips(session), onLoggedOut);
   const [driver, setDriver] = useState<string | null>(null);
   const wide = useWindowDimensions().width >= WIDE;
-
-  async function load() {
-    setError('');
-    try {
-      setTrips(await listTrips(session));
-    } catch (e) {
-      if (e instanceof LoggedOut) onLoggedOut();
-      else setError((e as Error).message);
-    }
-  }
-  useEffect(() => { load(); }, []);
+  const company = session.account.company?.name;
 
   const drivers = useMemo(() => [...new Set((trips ?? []).map((t) => t.driver_name))].sort(), [trips]);
   const shown = (trips ?? []).filter((t) => driver === null || t.driver_name === driver);
@@ -123,10 +254,10 @@ function TripsPage({ session, onOpen, onLoggedOut }: { session: Session; onOpen:
     <View style={s.stack}>
       <View style={s.headRow}>
         <View style={s.flex}>
-          <Text style={s.h2}>All trips</Text>
-          <Text style={s.muted}>Every drive uploaded to FairDrive, newest first.</Text>
+          <Text style={s.h2}>Trips</Text>
+          <Text style={s.muted}>{company ? `Drives from ${company}'s drivers, newest first.` : 'Every drive uploaded to FairDrive, newest first.'}</Text>
         </View>
-        <Button label="Refresh trips" outline small onPress={load} />
+        <Button label="Refresh trips" outline small onPress={reload} />
       </View>
 
       {error !== '' && <Text style={s.error}>{error}</Text>}
@@ -141,10 +272,12 @@ function TripsPage({ session, onOpen, onLoggedOut }: { session: Session; onOpen:
             <Stat label="Average driving score" value={scored.length ? average(scored.map((t) => t.driving_score as number)).toFixed(0) : '–'} />
           </View>
 
-          <View style={s.filterRow}>
-            <FilterChip label="All drivers" active={driver === null} onPress={() => setDriver(null)} />
-            {drivers.map((d) => <FilterChip key={d} label={d} active={driver === d} onPress={() => setDriver(d)} />)}
-          </View>
+          {drivers.length > 1 && (
+            <View style={s.filterRow}>
+              <FilterChip label="All drivers" active={driver === null} onPress={() => setDriver(null)} />
+              {drivers.map((d) => <FilterChip key={d} label={d} active={driver === d} onPress={() => setDriver(d)} />)}
+            </View>
+          )}
 
           <View style={s.table}>
             {wide && (
@@ -156,7 +289,13 @@ function TripsPage({ session, onOpen, onLoggedOut }: { session: Session; onOpen:
                 <Text style={[s.th, s.colNum]}>Old score</Text>
               </View>
             )}
-            {shown.length === 0 && <Text style={[s.muted, s.empty]}>No trips yet. They appear here once drivers send them.</Text>}
+            {shown.length === 0 && (
+              <Text style={[s.muted, s.empty]}>
+                {company
+                  ? `No trips yet. They appear here once your customers sign up in the FairDrive app, choose ${company} and send a drive.`
+                  : 'No trips yet. They appear here once drivers send them.'}
+              </Text>
+            )}
             {shown.map((trip, i) => <TripLine key={trip.trip_id} trip={trip} wide={wide} first={i === 0} onPress={() => onOpen(trip.trip_id)} />)}
           </View>
         </>
@@ -231,150 +370,3 @@ function TripPage({ session, tripId, onBack, onLoggedOut }: { session: Session; 
     </View>
   );
 }
-
-// Pieces
-
-const Wordmark = ({ light }: { light?: boolean }) => (
-  <View style={s.brandRow}>
-    <View style={[s.mark, light && s.markLight]}>
-      <MaterialCommunityIcons name="road-variant" size={16} color={light ? C.green : C.white} />
-    </View>
-    <Text style={[s.wordmark, light && s.onGreen]}>FairDrive</Text>
-  </View>
-);
-
-function Input(p: { label: string; value: string; onChange: (t: string) => void; placeholder: string; email?: boolean; secret?: boolean; onSubmit: () => void }) {
-  const [focused, setFocused] = useState(false);
-  return (
-    <View style={s.inputGroup}>
-      <Text style={s.inputLabel}>{p.label}</Text>
-      <TextInput
-        style={[s.input, focused && s.inputFocused]} value={p.value} onChangeText={p.onChange} placeholder={p.placeholder} placeholderTextColor="#A39B8D"
-        autoCapitalize="none" autoCorrect={false} keyboardType={p.email ? 'email-address' : 'default'} secureTextEntry={p.secret}
-        autoComplete={p.email ? 'email' : 'current-password'} onSubmitEditing={p.onSubmit} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-      />
-    </View>
-  );
-}
-
-const Stat = ({ label, value }: { label: string; value: string }) => (
-  <View style={s.stat}>
-    <Text style={s.muted}>{label}</Text>
-    <Text style={s.statValue}>{value}</Text>
-  </View>
-);
-
-const FilterChip = ({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) => (
-  <Pressable onPress={onPress} style={({ hovered }: { pressed: boolean; hovered?: boolean }) => [s.filter, hovered && s.filterHover, active && s.filterActive]}>
-    <Text style={[s.filterText, active && s.filterTextActive]}>{label}</Text>
-  </Pressable>
-);
-
-function Button({ label, outline, small, disabled, onPress }: { label: string; outline?: boolean; small?: boolean; disabled?: boolean; onPress: () => void }) {
-  return (
-    <Pressable disabled={disabled} onPress={onPress} style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
-      s.button, outline && s.buttonOutline, small && s.buttonSmall, hovered && (outline ? s.buttonOutlineHover : s.buttonHover),
-      pressed && s.buttonPressed, disabled && s.buttonDisabled,
-    ]}>
-      {({ hovered }: { pressed: boolean; hovered?: boolean }) => (
-        <Text style={[s.buttonText, outline && !hovered && s.buttonTextOutline, small && s.buttonTextSmall]}>{label}</Text>
-      )}
-    </Pressable>
-  );
-}
-
-function TextLink({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress}>
-      {({ hovered }: { pressed: boolean; hovered?: boolean }) => <Text style={[s.link, hovered && s.linkHover]}>{label}</Text>}
-    </Pressable>
-  );
-}
-
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.paper },
-  row: { flexDirection: 'row' },
-  flex: { flex: 1 },
-  content: { width: '100%', maxWidth: 1160, alignSelf: 'center', paddingHorizontal: 24 },
-  page: { paddingTop: 40, paddingBottom: 80 },
-  stack: { gap: 24 },
-  onGreen: { color: C.white },
-  onGreenMuted: { color: C.onGreenMuted },
-
-  loginPage: { flexGrow: 1, minHeight: '100%' } as object,
-  loginPanel: { backgroundColor: C.green, padding: 32, gap: 48 },
-  loginPanelWide: { flex: 1, padding: 56, justifyContent: 'space-between' },
-  loginPanelText: { gap: 16, maxWidth: 520 },
-  loginForm: { padding: 32, justifyContent: 'center' },
-  loginFormWide: { flex: 1, padding: 56 },
-  form: { width: '100%', maxWidth: 400, alignSelf: 'center', gap: 18 },
-
-  topBar: { height: 68, justifyContent: 'center', backgroundColor: C.paper, borderBottomWidth: 1, borderBottomColor: C.line },
-  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  topRight: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  mark: { width: 30, height: 30, borderRadius: 8, backgroundColor: C.green, alignItems: 'center', justifyContent: 'center' },
-  markLight: { backgroundColor: C.white },
-  wordmark: f(FONT.head, { fontSize: 22, letterSpacing: -0.4 }),
-  section: f(FONT.bodyMedium, { fontSize: 15, color: C.muted, paddingLeft: 12, marginLeft: 2, borderLeftWidth: 1, borderLeftColor: C.line }),
-
-  h1: f(FONT.head, { fontSize: 56, lineHeight: 60, letterSpacing: -1.6 }),
-  h1Narrow: { fontSize: 38, lineHeight: 42, letterSpacing: -1 },
-  h2: f(FONT.head, { fontSize: 36, lineHeight: 42, letterSpacing: -0.8 }),
-  lead: f(FONT.body, { fontSize: 19, lineHeight: 28 }),
-  muted: f(FONT.body, { fontSize: 15, lineHeight: 22, color: C.muted }),
-  error: f(FONT.bodyMedium, { fontSize: 15, color: C.red }),
-
-  inputGroup: { gap: 6 },
-  inputLabel: f(FONT.bodyMedium, { fontSize: 14 }),
-  input: { fontFamily: FONT.body, fontSize: 16, color: C.ink, backgroundColor: C.white, borderWidth: 1, borderColor: C.line, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13 },
-  inputFocused: { borderColor: C.green },
-
-  headRow: { flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap', gap: 16 },
-  loading: { marginTop: 40 },
-  statRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  stat: { flexGrow: 1, flexBasis: 160, gap: 4, backgroundColor: C.white, borderWidth: 1, borderColor: C.line, borderRadius: 16, padding: 20 },
-  statValue: f(FONT.head, { fontSize: 40, lineHeight: 46, letterSpacing: -1 }),
-
-  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  filter: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: C.line, backgroundColor: C.white },
-  filterHover: { borderColor: C.ink },
-  filterActive: { backgroundColor: C.ink, borderColor: C.ink },
-  filterText: f(FONT.bodyMedium, { fontSize: 14 }),
-  filterTextActive: { color: C.white },
-
-  table: { backgroundColor: C.white, borderWidth: 1, borderColor: C.line, borderRadius: 16, overflow: 'hidden' },
-  tr: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 14 },
-  trDivider: { borderTopWidth: 1, borderTopColor: C.line },
-  trHover: { backgroundColor: C.paper },
-  thRow: { backgroundColor: C.paper, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.line },
-  th: f(FONT.bodyMedium, { fontSize: 13, color: C.muted }),
-  td: f(FONT.bodyMedium, { fontSize: 15, fontVariant: ['tabular-nums'] }),
-  colTrip: { flex: 1 },
-  colNum: { width: 100, textAlign: 'right' },
-  colScore: { width: 150, alignItems: 'flex-end', textAlign: 'right' } as object,
-  tripCell: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  driver: f(FONT.bodyBold, { fontSize: 16 }),
-  empty: { padding: 20 },
-
-  back: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
-  tripHead: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  twoColumns: { flexDirection: 'row', alignItems: 'flex-start', gap: 24 },
-  mainColumn: { flex: 3 },
-  sideColumn: { flex: 2 },
-  panel: { backgroundColor: C.white, borderWidth: 1, borderColor: C.line, borderRadius: 16, padding: 24, gap: 8 },
-  panelTitle: f(FONT.headSemi, { fontSize: 22 }),
-
-  button: { backgroundColor: C.green, borderRadius: 999, paddingHorizontal: 26, paddingVertical: 15, alignItems: 'center' },
-  buttonOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: C.ink },
-  buttonSmall: { paddingHorizontal: 18, paddingVertical: 9 },
-  buttonHover: { backgroundColor: C.greenHover, transform: [{ translateY: -1 }] },
-  buttonOutlineHover: { backgroundColor: C.ink },
-  buttonPressed: { transform: [{ scale: 0.98 }] },
-  buttonDisabled: { opacity: 0.4 },
-  buttonText: f(FONT.bodyBold, { color: C.white, fontSize: 17 }),
-  buttonTextOutline: { color: C.ink },
-  buttonTextSmall: { fontSize: 14 },
-  link: f(FONT.bodyBold, { fontSize: 15, color: C.green }),
-  linkHover: { textDecorationLine: 'underline' },
-});

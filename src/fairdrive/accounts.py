@@ -1,6 +1,7 @@
-"""Accounts for drivers (phone app) and admins (web dashboard). Passwords are stored only as salted scrypt hashes.
+"""Accounts for drivers (phone app) and staff (web dashboard). Passwords are stored only as salted scrypt hashes.
 
-Drivers sign up in the app. Admins are added on the server with `fairdrive add-admin EMAIL`.
+Drivers sign up in the app. Staff use the web dashboard: super admins are added on the server with
+`fairdrive add-admin EMAIL`; insurance company owners sign up on the dashboard and invite their team.
 """
 
 import hashlib
@@ -48,6 +49,14 @@ class Accounts:
 
     def all(self) -> list[dict]:
         return [_public(email, account) for email, account in self._read().items()]
+
+    def update(self, email: str, **profile) -> dict:
+        """Changes profile fields (not the password)."""
+        with self._lock:
+            accounts = self._read()
+            accounts[email] |= profile
+            self._write(accounts)
+        return self.get(email)
 
     def remove(self, email: str) -> None:
         with self._lock:
