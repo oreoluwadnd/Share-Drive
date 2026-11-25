@@ -1,0 +1,94 @@
+# Checks every pull request. On main, deploys the API to Railway and then the web app to Vercel,
+# only if every check passed. Setup (tokens, IDs, the API address): docs/deploy.md.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  api-tests:
+    name: API tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+      - run: uv sync --frozen
+      - run: uv run pytest -q
+
+  app-checks:
+    name: App typecheck and web build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      # Checks that the web app builds. The deployed build uses the real API address from Vercel.
+      - run: npx expo export --platform web
+        env:
+          EXPO_PUBLIC_API_URL: https://api.example.invalid
+
+  deploy-api:
+    name: Deploy API to Railway
+    needs: [api-tests, app-checks]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-api
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_SERVICE: ${{ vars.RAILWAY_SERVICE }}
+    steps:
+      - name: Check the Railway settings are in GitHub
+        run: |
+          test -n "$RAILWAY_TOKEN" || { echo "::error::Add the RAILWAY_TOKEN secret (see docs/deploy.md)"; exit 1; }
+          test -n "$RAILWAY_SERVICE" || { echo "::error::Add the RAILWAY_SERVICE variable (see docs/deploy.md)"; exit 1; }
+      - uses: actions/checkout@v7
+      - run: npm install --global @railway/cli@5.75.0
+      # Uploads the repository; Railway builds the Dockerfile and waits for the deploy. Fails the job if it fails.
+      - run: railway up --ci --service "$RAILWAY_SERVICE"
+
+  deploy-web:
+    name: Deploy web app to Vercel
+    needs: [deploy-api]
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-web
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - name: Check the Vercel settings are in GitHub
+        run: |
+          for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            test -n "${!name}" || { echo "::error::Add the $name secret (see docs/deploy.md)"; exit 1; }
+          done
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - run: npm ci
+      - run: npm install --global vercel@66.6.0
+      # Pulls the project's settings and Production variables (EXPO_PUBLIC_API_URL), builds here, uploads the result.
+      - run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+      - run: vercel build --prod --token="$VERCEL_TOKEN"
+      - run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
