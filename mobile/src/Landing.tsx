@@ -3,13 +3,11 @@
 // flat colours (no glass, gradients or resting shadows), no eyebrow labels or step numbers, no captions under photos.
 // Every number comes from docs/fairness-audit.md (UAH-DriveSet, 6 drivers, 37 scored trips). Photos: Gemini.
 
-import { BricolageGrotesque_600SemiBold, BricolageGrotesque_700Bold } from '@expo-google-fonts/bricolage-grotesque';
-import { DMSans_400Regular, DMSans_500Medium, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { useFonts } from 'expo-font';
 import { ComponentRef, ReactNode, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Image, ImageSourcePropType, LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, TextStyle, useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, Image, ImageSourcePropType, LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
+import { C, FONT, text as f, useBrandFonts } from './brand';
 import { Moment } from './fairdrive';
 import { ScoreRing } from './motion';
 import { PHOTOS } from './photos';
@@ -17,15 +15,11 @@ import { MomentRow } from './score';
 import { T } from './theme';
 import { IconName, ui } from './ui';
 
-const C = {
-  paper: '#F6F2EA', surface: '#EDE6D9', white: '#FFFFFF', ink: '#17140F', muted: '#665F53', line: '#DDD5C6',
-  green: '#137A41', greenHover: '#0F6A38', greenSoft: '#DDEEDD', amber: '#B45309', red: '#C2410C', onInk: '#F6F2EA', onInkMuted: '#A9A193',
-};
-const HEAD = 'BricolageGrotesque_700Bold';
-const HEAD_SEMI = 'BricolageGrotesque_600SemiBold';
-const BODY = 'DMSans_400Regular';
-const BODY_MEDIUM = 'DMSans_500Medium';
-const BODY_BOLD = 'DMSans_700Bold';
+const HEAD = FONT.head;
+const HEAD_SEMI = FONT.headSemi;
+const BODY = FONT.body;
+const BODY_MEDIUM = FONT.bodyMedium;
+const BODY_BOLD = FONT.bodyBold;
 const WIDE = 900;
 const SAMPLE_MOMENTS: Moment[] = [
   { kind: 'hard_brake', label: 'Hard braking', count: 3, normal: 1.2 },
@@ -34,7 +28,7 @@ const SAMPLE_MOMENTS: Moment[] = [
 ];
 
 export default function Landing({ onLogin }: { onLogin: () => void }) {
-  const [fontsReady] = useFonts({ BricolageGrotesque_600SemiBold, BricolageGrotesque_700Bold, DMSans_400Regular, DMSans_500Medium, DMSans_700Bold });
+  const fontsReady = useBrandFonts();
   const wide = useWindowDimensions().width >= WIDE;
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
   const anchors = useRef<Record<string, number>>({});
@@ -352,8 +346,6 @@ function TextLink({ label, large, onPress }: { label: string; large?: boolean; o
   );
 }
 
-const f = (family: string, style: TextStyle): TextStyle => ({ fontFamily: family, color: C.ink, ...style });
-
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.paper },
   flex: { flex: 1 },
@@ -366,7 +358,7 @@ const s = StyleSheet.create({
   onInk: { color: C.onInk },
   onInkMuted: { color: C.onInkMuted },
   onGreen: { color: C.white },
-  onGreenMuted: { color: '#D7EBDD', marginTop: 16 },
+  onGreenMuted: { color: C.onGreenMuted, marginTop: 16 },
 
   nav: { height: 68, justifyContent: 'center', backgroundColor: C.paper, borderBottomWidth: 1, borderBottomColor: C.line },
   navRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

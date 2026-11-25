@@ -62,7 +62,7 @@ export const NotScoredBadge = () => (
   <View style={s.notScored}><Text style={s.notScoredText} numberOfLines={1}>Not scored</Text></View>
 );
 
-const AVATAR_COLORS = ['#22C55E', '#3B82F6', '#F59E0B', '#EC4899', '#8B5CF6', '#14B8A6'];
+const AVATAR_COLORS = ['#22C55E', '#3B82F6', '#F59E0B', '#EC4899', '#0EA5E9', '#14B8A6'];
 
 export function Avatar({ name, big }: { name: string; big?: boolean }) {
   const color = AVATAR_COLORS[[...name].reduce((sum, c) => sum + c.charCodeAt(0), 0) % AVATAR_COLORS.length];
