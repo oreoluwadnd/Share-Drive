@@ -1,7 +1,7 @@
 // The web front page. Warm and bold, after Corgi and Superpower on Mobbin, written to the taste skill's rules
 // (tasteskill.dev): a plain headline naming the product, one hard fact on the first screen, one idea per screen,
 // flat colours (no glass, gradients or resting shadows), no eyebrow labels or step numbers, no captions under photos.
-// Every number comes from docs/fairness-audit.md (UAH-DriveSet, 6 drivers, 37 scored trips). Photos: Gemini.
+// Every number comes from docs/fairness-audit.md (UAH-DriveSet, 6 drivers, 37 scored trips).
 
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { ComponentRef, ReactNode, useEffect, useRef, useState } from 'react';
@@ -249,7 +249,7 @@ function Footer({ goTo, onLogin }: { goTo: (anchor: string) => void; onLogin: ()
           </View>
         </View>
         <View style={s.rule} />
-        <Text style={s.small}>A student research project, 2026. Photos generated with Gemini.</Text>
+        <Text style={s.small}>© 2026 FairDrive</Text>
       </View>
     </View>
   );

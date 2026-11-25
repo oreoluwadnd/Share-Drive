@@ -7,6 +7,7 @@ import * as Sharing from 'expo-sharing';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { FONT } from '../../brand';
 import { sendTrip, TripResult } from '../../fairdrive';
 import { Page } from '../../page';
 import { PHOTOS } from '../../photos';
@@ -198,14 +199,14 @@ function Buttons({ onSave, onNew }: { onSave?: () => void; onNew: () => void }) 
 const s = StyleSheet.create({
   recordingPage: { flex: 1, padding: 20, paddingBottom: 48 },
   timerPill: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', backgroundColor: T.record, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8, marginTop: 12 },
-  timerPillText: { color: '#FFFFFF', fontSize: 17, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  timerPillText: { color: '#FFFFFF', fontSize: 17, fontFamily: FONT.bodyBold, fontVariant: ['tabular-nums'] },
   dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FFFFFF' },
   spinner: { marginBottom: 24 },
-  bigNumber: { color: T.text, fontSize: 120, fontWeight: '800', fontVariant: ['tabular-nums'], letterSpacing: -6 },
-  bigUnit: { color: T.muted, fontSize: 17, fontWeight: '600', marginTop: -10, marginBottom: 32 },
+  bigNumber: { color: T.text, fontSize: 120, fontFamily: FONT.head, fontVariant: ['tabular-nums'], letterSpacing: -6 },
+  bigUnit: { color: T.muted, fontSize: 17, fontFamily: FONT.bodyMedium, marginTop: -10, marginBottom: 32 },
   statRow: { flexDirection: 'row', gap: 12 },
   stat: { width: 140, alignItems: 'center', gap: 2 },
-  statValue: { color: T.text, fontSize: 22, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  statValue: { color: T.text, fontSize: 22, fontFamily: FONT.head, fontVariant: ['tabular-nums'] },
   stopArea: { alignItems: 'center', gap: 12 },
   stopButton: { width: 92, height: 92, borderRadius: 46, backgroundColor: T.record, alignItems: 'center', justifyContent: 'center', ...T.cardShadow },
   stopSquare: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#FFFFFF' },

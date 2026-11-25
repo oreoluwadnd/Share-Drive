@@ -1,18 +1,19 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Tabs } from 'expo-router';
 
+import { FONT } from '../../brand';
 import { T } from '../../theme';
 import { IconName } from '../../ui';
 
 const icon = (name: IconName) => ({ focused, size }: { focused: boolean; size: number }) => (
-  <MaterialCommunityIcons name={name} size={size} color={focused ? T.text : T.faint} />
+  <MaterialCommunityIcons name={name} size={size} color={focused ? T.primary : T.faint} />
 );
 
 export default function TabsLayout() {
   return (
     <Tabs screenOptions={{
-      headerShown: false, tabBarActiveTintColor: T.text, tabBarInactiveTintColor: T.faint,
-      tabBarStyle: T.tabBar, tabBarLabelStyle: { fontSize: 12, fontWeight: '700' },
+      headerShown: false, tabBarActiveTintColor: T.primary, tabBarInactiveTintColor: T.faint,
+      tabBarStyle: T.tabBar, tabBarLabelStyle: { fontSize: 12, fontFamily: FONT.bodyBold },
     }}>
       <Tabs.Screen name="drive" options={{ title: 'Drive', tabBarIcon: icon('steering') }} />
       <Tabs.Screen name="trips" options={{ title: 'Trips', tabBarIcon: icon('map-marker-path') }} />

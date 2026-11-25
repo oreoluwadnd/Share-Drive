@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Polyline } from 'react-native-svg';
 
+import { FONT } from './brand';
 import { Phone } from './fairdrive';
 import { T } from './theme';
 import { drivingTier, ui } from './ui';
@@ -93,12 +94,12 @@ const s = StyleSheet.create({
   dotItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot: { width: 10, height: 10, borderRadius: 5 },
   badge: { flexDirection: 'row', alignItems: 'baseline', gap: 6, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
-  badgeNumber: { fontSize: 18, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  badgeWord: { fontSize: 12, fontWeight: '700' },
+  badgeNumber: { fontSize: 18, fontFamily: FONT.head, fontVariant: ['tabular-nums'] },
+  badgeWord: { fontSize: 12, fontFamily: FONT.bodyBold },
   notScored: { backgroundColor: T.track, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
-  notScoredText: { color: T.muted, fontSize: 13, fontWeight: '700' },
+  notScoredText: { color: T.muted, fontSize: 13, fontFamily: FONT.bodyBold },
   avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   avatarBig: { width: 64, height: 64, borderRadius: 32 },
-  avatarText: { fontSize: 14, fontWeight: '800' },
-  avatarTextBig: { fontSize: 22 },
+  avatarText: { fontSize: 14, fontFamily: FONT.head },
+  avatarTextBig: { fontFamily: FONT.body, fontSize: 22 },
 });

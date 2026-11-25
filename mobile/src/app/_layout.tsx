@@ -5,6 +5,7 @@ import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
+import { FONT, useBrandFonts } from '../brand';
 import { SessionProvider, useSession } from '../session';
 import { T } from '../theme';
 
@@ -21,9 +22,10 @@ export default function RootLayout() {
 
 function Screens() {
   const { ready, onboarded, session } = useSession();
-  useEffect(() => { if (ready) SplashScreen.hideAsync(); }, [ready]);
-  // Until the saved sign-in is loaded the guards below can't be known, and guessing would send people to the wrong screen.
-  if (!ready) return null;
+  const fontsReady = useBrandFonts();
+  useEffect(() => { if (ready && fontsReady) SplashScreen.hideAsync(); }, [ready, fontsReady]);
+  // Until the saved sign-in and the fonts are loaded, show nothing: guessing the guards would send people to the wrong screen.
+  if (!ready || !fontsReady) return null;
 
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: T.background[0] } }}>
@@ -40,7 +42,7 @@ function Screens() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="trip/[id]" options={{
           headerShown: true, title: 'Trip', headerBackTitle: 'Back', headerShadowVisible: false,
-          headerStyle: { backgroundColor: T.background[0] }, headerTintColor: T.text,
+          headerStyle: { backgroundColor: T.background[0] }, headerTintColor: T.text, headerTitleStyle: { fontFamily: FONT.headSemi },
         }} />
         <Stack.Screen name="delete-account" options={{ presentation: 'modal' }} />
       </Stack.Protected>

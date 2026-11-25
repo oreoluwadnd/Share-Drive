@@ -4,6 +4,7 @@ import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 
+import { FONT } from './brand';
 import { T } from './theme';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -44,8 +45,8 @@ export function ScoreRing({ value, colors, word }: { value: number; colors: read
 }
 
 const ring = StyleSheet.create({
-  number: { color: T.text, fontSize: 72, fontWeight: '800', fontVariant: ['tabular-nums'], letterSpacing: -3 },
-  word: { fontSize: 15, fontWeight: '800', marginTop: -4 },
+  number: { color: T.text, fontSize: 72, fontFamily: FONT.head, fontVariant: ['tabular-nums'], letterSpacing: -3 },
+  word: { fontSize: 15, fontFamily: FONT.head, marginTop: -4 },
 });
 
 /** Fades and slides its content up, after `delay` milliseconds. */

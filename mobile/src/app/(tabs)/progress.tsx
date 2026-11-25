@@ -6,6 +6,7 @@ import { Fragment, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Line, Polyline, Text as SvgText } from 'react-native-svg';
 
+import { FONT } from '../../brand';
 import { Moment, TripRow } from '../../fairdrive';
 import { Page } from '../../page';
 import { T } from '../../theme';
@@ -92,7 +93,7 @@ function ScoreChart({ scored }: { scored: Scored[] }) {
             {[0, 50, 100].map((v) => (
               <Fragment key={v}>
                 <Line x1={left} x2={width - right} y1={y(v)} y2={y(v)} stroke={T.track} strokeWidth={1} />
-                <SvgText x={0} y={y(v) + 4} fontSize={11} fill={T.muted}>{v}</SvgText>
+                <SvgText x={0} y={y(v) + 4} fontSize={11} fontFamily={FONT.body} fill={T.muted}>{v}</SvgText>
               </Fragment>
             ))}
             <Polyline points={scored.map((t, i) => `${x(i)},${y(t.driving_score)}`).join(' ')} fill="none" stroke={T.ring.good[0]} strokeWidth={2} strokeLinejoin="round" />
@@ -171,18 +172,18 @@ const s = StyleSheet.create({
   empty: { alignItems: 'center', gap: 12 },
   headline: { gap: 4 },
   headlineRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10 },
-  big: { color: T.text, fontSize: 64, fontWeight: '800', letterSpacing: -2, fontVariant: ['tabular-nums'] },
-  tier: { fontSize: 18, fontWeight: '800' },
+  big: { color: T.text, fontSize: 64, fontFamily: FONT.head, letterSpacing: -2, fontVariant: ['tabular-nums'] },
+  tier: { fontSize: 18, fontFamily: FONT.head },
   trend: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  pickedValue: { color: T.text, fontWeight: '800' },
+  pickedValue: { color: T.text, fontFamily: FONT.bodyBold },
   axisRow: { flexDirection: 'row', justifyContent: 'space-between', paddingLeft: 30 },
   moments: { paddingVertical: 8 },
   momentRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
   divider: { borderTopWidth: 1, borderTopColor: T.track },
   flex: { flex: 1, gap: 4 },
-  momentLabel: { color: T.text, fontSize: 16, fontWeight: '700' },
-  times: { color: T.text, fontSize: 22, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  momentLabel: { color: T.text, fontSize: 16, fontFamily: FONT.bodyBold },
+  times: { color: T.text, fontSize: 22, fontFamily: FONT.head, fontVariant: ['tabular-nums'] },
   totals: { flexDirection: 'row', gap: 12 },
   total: { flex: 1, alignItems: 'center', gap: 2 },
-  totalValue: { color: T.text, fontSize: 26, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  totalValue: { color: T.text, fontSize: 26, fontFamily: FONT.head, fontVariant: ['tabular-nums'] },
 });

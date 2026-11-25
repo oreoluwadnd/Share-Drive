@@ -5,6 +5,7 @@ import { Link } from 'expo-router';
 import { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { FONT } from '../brand';
 import { Page } from '../page';
 import { PHOTOS } from '../photos';
 import { useSession } from '../session';
@@ -74,8 +75,8 @@ const Permission = ({ icon, title, text }: { icon: IconName; title: string; text
 
 const s = StyleSheet.create({
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  brand: { color: T.text, fontSize: 17, fontWeight: '800', letterSpacing: 0.3 },
-  skip: { color: T.muted, fontSize: 16, fontWeight: '700' },
+  brand: { color: T.text, fontSize: 17, fontFamily: FONT.head, letterSpacing: 0.3 },
+  skip: { color: T.muted, fontSize: 16, fontFamily: FONT.bodyBold },
   visual: { minHeight: 240, justifyContent: 'center', marginVertical: 12 },
   photo: { width: '100%', height: 240, borderRadius: 28 },
   permissions: { gap: 4 },

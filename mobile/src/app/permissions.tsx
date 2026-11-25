@@ -5,6 +5,7 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Linking, Platform, StyleSheet, Text, View } from 'react-native';
 
+import { FONT } from '../brand';
 import { Page } from '../page';
 import { T } from '../theme';
 import { IconName, PrimaryButton, SecondaryButton, ui } from '../ui';
@@ -61,6 +62,6 @@ const s = StyleSheet.create({
   card: { gap: 10 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   step: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
-  stepNumber: { color: T.text, fontSize: 14, fontWeight: '800', width: 22, height: 22, borderRadius: 11, backgroundColor: T.track, textAlign: 'center', lineHeight: 22, overflow: 'hidden' },
+  stepNumber: { color: T.text, fontSize: 14, fontFamily: FONT.head, width: 22, height: 22, borderRadius: 11, backgroundColor: T.track, textAlign: 'center', lineHeight: 22, overflow: 'hidden' },
   row: { flexDirection: 'row' },
 });

@@ -6,6 +6,7 @@ import { Href, router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { FONT } from '../../brand';
 import { Page } from '../../page';
 import { useSession, useSignedIn } from '../../session';
 import { T } from '../../theme';
@@ -60,9 +61,9 @@ function Row(p: { icon: IconName; label: string; detail?: string; href?: Href; o
 const s = StyleSheet.create({
   who: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   flex: { flex: 1 },
-  name: { color: T.text, fontSize: 22, fontWeight: '800' },
+  name: { color: T.text, fontSize: 22, fontFamily: FONT.head },
   list: { paddingVertical: 6, gap: 0 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 },
   rowPressed: { opacity: 0.6 },
-  rowLabel: { flex: 1, fontSize: 16, fontWeight: '600' },
+  rowLabel: { flex: 1, fontSize: 16, fontFamily: FONT.bodyMedium },
 });
