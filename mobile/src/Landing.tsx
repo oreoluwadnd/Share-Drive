@@ -93,7 +93,7 @@ function Hero({ wide, onHow, onResults }: { wide: boolean; onHow: () => void; on
           </Text>
           <View style={s.fact}>
             <Text style={s.factNumber}>93%</Text>
-            <Text style={s.factText}>smaller score gap between highways and city streets than a standard driving score.</Text>
+            <Text style={s.factText}>smaller score gap between highway and secondary-road trips than a score that ignores conditions.</Text>
           </View>
           <View style={s.actions}>
             <Button label="See how it works" onPress={onHow} />
@@ -136,7 +136,7 @@ function Roads({ wide }: { wide: boolean }) {
   return (
     <View style={[s.band, s.surfaceBand]}>
       <View style={s.content}>
-        <Heading wide={wide} title="Normal braking depends on the road." rest="Standard scores ignore that. FairDrive builds it in." />
+        <Heading wide={wide} title="Normal braking depends on the road." rest="Scores that only count harsh moments ignore that." />
         <View style={[s.tiles, wide && s.row]}>
           <Tile wide={wide} title="Expects more braking downtown" text="Lights, crossings and traffic make frequent stops normal on city streets.">
             <Photo source={PHOTOS.city} ratio={4 / 3} label="Brake lights in city traffic at dusk, seen from the driver's seat" />
@@ -159,7 +159,7 @@ function HowItWorks({ wide }: { wide: boolean }) {
           <Tile wide={wide} white title="Records how the car moves" text="The phone logs braking, speeding up and turning 50 times a second, and its position once a second.">
             <Photo source={PHOTOS.mount} ratio={4 / 3} label="A phone in a dashboard mount, on a tree-lined street" />
           </Tile>
-          <Tile wide={wide} white title="Looks up the conditions" text="Road type, speed limit, daylight and weather for every kilometre of the drive.">
+          <Tile wide={wide} white title="Looks up the conditions" text="Road type and speed limit for every kilometre, plus the daylight and weather of the drive.">
             <View style={s.conditions}>
               {([['road-variant', 'Main road'], ['car-speed-limiter', '50 km/h limit'], ['weather-night', 'After dark'], ['weather-rainy', 'Light rain']] as [IconName, string][]).map(([icon, label]) => (
                 <View key={label} style={s.condition}>
@@ -202,11 +202,11 @@ function Results({ wide }: { wide: boolean }) {
       <View style={s.content}>
         <Heading wide={wide} onInk title="Tested on 37 trips by 6 drivers." rest="On UAH-DriveSet, a public dataset." />
         <View style={[s.tiles, wide && s.row]}>
-          <GapTile wide={wide} title="Standard score" gap="19-point gap" values={[70.1, 51.2]} color={C.red} />
-          <GapTile wide={wide} title="FairDrive" gap="1-point gap" values={[59.0, 57.7]} color="#4ADE80" />
+          <GapTile wide={wide} title="Score that ignores conditions" gap="18.9-point gap" values={[51.2, 70.1]} color={C.red} />
+          <GapTile wide={wide} title="FairDrive" gap="1.3-point gap" values={[57.7, 59.0]} color="#4ADE80" />
         </View>
         <View style={[s.stats, wide && s.row]}>
-          <Stat value="93%" text="smaller gap between road types than the standard score" />
+          <Stat value="93%" text="smaller gap between road types than a score that ignores conditions" />
           <Stat value="22.6%" text="more accurate than a simple average, on drivers it had never seen" />
         </View>
         <Text style={[s.small, s.onInkMuted, s.note]}>Measured on drives in Spain. Drives in Ontario are next.</Text>
@@ -308,7 +308,7 @@ const GapTile = ({ wide, title, gap, values, color }: { wide: boolean; title: st
       <Text style={[s.tileTitle, s.onInk]}>{title}</Text>
       <Text style={[s.gapLabel, { color }]}>{gap}</Text>
     </View>
-    {(['Mostly highway', 'Other roads'] as const).map((label, i) => (
+    {(['Mostly highway', 'Secondary roads'] as const).map((label, i) => (
       <View key={label} style={s.bar}>
         <View style={s.barLabels}>
           <Text style={[s.small, s.onInkMuted]}>{label}</Text>
@@ -418,7 +418,7 @@ const s = StyleSheet.create({
   scoreValue: f(HEAD, { fontSize: 104, lineHeight: 112, letterSpacing: -3, marginVertical: 4 }),
 
   darkTile: { backgroundColor: '#262219', borderRadius: 24, padding: 28, gap: 20 },
-  gapHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  gapHead: { gap: 6 },
   gapLabel: f(BODY_BOLD, { fontSize: 16 }),
   bar: { gap: 8 },
   barLabels: { flexDirection: 'row', justifyContent: 'space-between' },
