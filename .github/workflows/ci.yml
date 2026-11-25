@@ -58,6 +58,8 @@ jobs:
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
       - name: Check the Vercel settings are in GitHub
+        # Runs before checkout, so mobile/ (the job's default directory) does not exist yet.
+        working-directory: ${{ github.workspace }}
         run: |
           for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
             test -n "${!name}" || { echo "::error::Add the $name secret (see docs/deploy.md)"; exit 1; }
