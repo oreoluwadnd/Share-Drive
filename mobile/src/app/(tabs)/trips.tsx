@@ -4,6 +4,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { router } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { FONT } from '../../brand';
 import { TripRow } from '../../fairdrive';
 import { Page } from '../../page';
 import { T } from '../../theme';
@@ -54,5 +55,5 @@ const s = StyleSheet.create({
   card: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 16 },
   icon: { width: 44, height: 44, borderRadius: 22, backgroundColor: T.track, alignItems: 'center', justifyContent: 'center' },
   flex: { flex: 1 },
-  date: { color: T.text, fontSize: 16, fontWeight: '700' },
+  date: { color: T.text, fontSize: 16, fontFamily: FONT.bodyBold },
 });

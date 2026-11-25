@@ -4,6 +4,7 @@ import { Link } from 'expo-router';
 import { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { FONT } from './brand';
 import { PHOTOS } from './photos';
 import { Page } from './page';
 import { T } from './theme';
@@ -31,5 +32,5 @@ export function AuthForm(p: {
 }
 
 const s = StyleSheet.create({
-  brand: { color: T.text, fontSize: 17, fontWeight: '800', letterSpacing: 0.3 },
+  brand: { color: T.text, fontSize: 17, fontFamily: FONT.head, letterSpacing: 0.3 },
 });

@@ -41,7 +41,7 @@ const SECTIONS: { icon: IconName; title: string; points: string[] }[] = [
     title: 'Who sees your trips',
     points: [
       'You, in this app.',
-      'The admins of your FairDrive server (the research team), to check that scoring is fair.',
+      'The FairDrive team, to check that scoring is fair.',
       'Nobody else. Your data is not sold or shared.',
     ],
   },
@@ -56,7 +56,7 @@ export default function Privacy() {
   return (
     <Page edges={['top', 'bottom']}>
       <Text style={ui.title}>Privacy</Text>
-      <Text style={ui.lead}>FairDrive is a student research project. Here is exactly what it does with your data.</Text>
+      <Text style={ui.lead}>Here is exactly what FairDrive does with your data.</Text>
       {SECTIONS.map((section) => (
         <View key={section.title} style={[ui.card, s.section]}>
           <View style={s.head}>

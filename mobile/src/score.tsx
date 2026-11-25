@@ -2,9 +2,9 @@
 // Used by the driver's results screen and the admin trip page.
 
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { FONT } from './brand';
 import { Moment, Reasons as TripReasons, Score } from './fairdrive';
 import { ScoreRing, SlideIn } from './motion';
 import { T } from './theme';
@@ -17,7 +17,6 @@ export function ScoredTrip({ score, reasons }: { score: Score; reasons: TripReas
     <View style={ui.section}>
       <SlideIn delay={0}>
         <View style={[ui.card, s.hero]}>
-          <LinearGradient colors={[`${T.ring[tier.level][0]}22`, '#FFFFFF00']} style={StyleSheet.absoluteFill} />
           <ScoreRing value={score.driving_score} colors={T.ring[tier.level]} word={tier.word} />
           <Text style={s.headline}>{headline.title}</Text>
           <Text style={[ui.muted, ui.centerText]}>{headline.detail}</Text>
@@ -67,12 +66,12 @@ export function MomentRow({ moment, first }: { moment: Moment; first: boolean })
         </View>
         <Text style={s.momentLabel}>{moment.label}</Text>
         <Text style={s.momentValue}>
-          <Text style={{ color: colors[0], fontWeight: '800' }}>{moment.count}</Text>
+          <Text style={{ color: colors[0], fontFamily: FONT.bodyBold }}>{moment.count}</Text>
           <Text style={ui.muted}>  normal {moment.normal.toFixed(moment.normal < 10 ? 1 : 0)}</Text>
         </Text>
       </View>
       <View style={s.track}>
-        <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[s.fill, { width: `${(100 * moment.count) / scale}%` }]} />
+        <View style={[s.fill, { width: `${(100 * moment.count) / scale}%`, backgroundColor: colors[0] }]} />
         <View style={[s.normalMark, { left: `${(100 * moment.normal) / scale}%` }]} />
       </View>
     </View>
@@ -128,7 +127,7 @@ const Reasons = ({ title, items }: { title: string; items: { text: string; icon:
 
 const s = StyleSheet.create({
   hero: { alignItems: 'center', paddingVertical: 28, gap: 10, overflow: 'hidden' },
-  headline: { color: T.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.4, marginTop: 6 },
+  headline: { color: T.text, fontSize: 22, fontFamily: FONT.head, letterSpacing: -0.4, marginTop: 6 },
   chipRow: { flexDirection: 'row', gap: 8, marginTop: 6, flexWrap: 'wrap', justifyContent: 'center' },
   gapTop: { marginTop: 12 },
   tileHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -136,14 +135,14 @@ const s = StyleSheet.create({
   reasonIcon: { marginTop: 1 },
   tileRow: { flexDirection: 'row', gap: 12 },
   tile: { flex: 1, gap: 2 },
-  tileNumber: { color: T.text, fontSize: 40, fontWeight: '800', fontVariant: ['tabular-nums'], letterSpacing: -1 },
+  tileNumber: { color: T.text, fontSize: 40, fontFamily: FONT.head, fontVariant: ['tabular-nums'], letterSpacing: -1 },
   momentRow: { gap: 10, paddingVertical: 10 },
   momentDivider: { borderTopColor: T.track, borderTopWidth: 1 },
   momentHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  momentLabel: { color: T.text, fontSize: 16, fontWeight: '700', flex: 1 },
-  momentValue: { fontSize: 16, fontVariant: ['tabular-nums'] },
+  momentLabel: { color: T.text, fontSize: 16, fontFamily: FONT.bodyBold, flex: 1 },
+  momentValue: { fontFamily: FONT.body, fontSize: 16, fontVariant: ['tabular-nums'] },
   track: { height: 10, borderRadius: 5, backgroundColor: T.track },
   fill: { height: 10, borderRadius: 5 },
   normalMark: { position: 'absolute', top: -4, width: 3, height: 18, borderRadius: 2, backgroundColor: T.text },
-  legend: { color: T.muted, fontSize: 13, marginTop: 4 },
+  legend: { fontFamily: FONT.body, color: T.muted, fontSize: 13, marginTop: 4 },
 });

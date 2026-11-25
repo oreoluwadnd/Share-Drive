@@ -1,8 +1,7 @@
 // The frame of every phone screen: the soft background, the safe area and a scrolling column.
 
-import { LinearGradient } from 'expo-linear-gradient';
 import { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { KeyboardAvoidingView, Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Edge, SafeAreaView } from 'react-native-safe-area-context';
 
 import { T } from './theme';
@@ -10,7 +9,7 @@ import { ui } from './ui';
 
 export function Page(p: { children: ReactNode; scroll?: boolean; edges?: Edge[]; refreshing?: boolean; onRefresh?: () => void }) {
   return (
-    <LinearGradient colors={T.background} style={s.fill}>
+    <View style={[s.fill, s.paper]}>
       <SafeAreaView edges={p.edges ?? ['top']} style={s.fill}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.fill}>
           {p.scroll === false ? p.children : (
@@ -24,11 +23,12 @@ export function Page(p: { children: ReactNode; scroll?: boolean; edges?: Edge[];
           )}
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
   fill: { flex: 1 },
+  paper: { backgroundColor: T.background[0] },
   column: { width: '100%', maxWidth: 560, alignSelf: 'center' },
 });
