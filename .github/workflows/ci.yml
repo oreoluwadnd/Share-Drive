@@ -37,10 +37,7 @@ jobs:
           cache-dependency-path: mobile/package-lock.json
       - run: npm ci
       - run: npx tsc --noEmit
-      # Checks that the web app builds. The deployed build uses the real API address from Vercel.
       - run: npx expo export --platform web
-        env:
-          EXPO_PUBLIC_API_URL: https://api.example.invalid
 
   deploy-web:
     name: Deploy web app to Vercel
@@ -72,7 +69,7 @@ jobs:
           cache-dependency-path: mobile/package-lock.json
       - run: npm ci
       - run: npm install --global vercel@66.6.0
-      # Pulls the project's settings and Production variables (EXPO_PUBLIC_API_URL), builds here, uploads the result.
+      # Pulls the project's settings, builds here, uploads the result.
       - run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
       - run: vercel build --prod --token="$VERCEL_TOKEN"
       - run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"

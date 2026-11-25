@@ -62,14 +62,13 @@ On the server, `fairdrive` commands use `/data` by themselves (the image sets `F
 
 1. On your laptop, in `mobile/`: `npx vercel@66.6.0 link`, and create a new project when asked. This makes the project without connecting GitHub, and writes `mobile/.vercel/project.json` (git ignores it).
 2. Copy `orgId` and `projectId` from `mobile/.vercel/project.json`.
-3. In the Vercel project → **Settings → Environment Variables**: add `EXPO_PUBLIC_API_URL` = the Railway address, for **Production**.
-4. vercel.com → **Account Settings → Tokens** → create a token.
-5. In GitHub, secrets:
+3. vercel.com → **Account Settings → Tokens** → create a token.
+4. In GitHub, secrets:
    - `VERCEL_TOKEN` = that token
    - `VERCEL_ORG_ID` = `orgId`
    - `VERCEL_PROJECT_ID` = `projectId`
 
-The API address is built into the site, so after changing `EXPO_PUBLIC_API_URL`, push to `main` again (or re-run the workflow) to rebuild.
+The site and the phone app talk to the API address in `mobile/src/config.ts` (`https://share-drive-production.up.railway.app`). If the Railway address ever changes, change it there.
 
 `mobile/vercel.json` builds the web export and sends every page to `index.html`, so `/admin` opens directly.
 
@@ -83,9 +82,9 @@ Open the failed run under the repository's **Actions** tab:
 
 ## 3. Phone app
 
-**Testing with Expo Go:** in `mobile/`, copy `.env.example` to `.env`, set `EXPO_PUBLIC_API_URL` to the Railway address, then `npx expo start`. Drivers' phones talk to Railway, so they no longer need to be on the laptop's Wi-Fi to send drives. The laptop still serves the app to Expo Go: use `npx expo start --tunnel` if the phone isn't on the same Wi-Fi.
+**Testing with Expo Go:** in `mobile/`, run `npx expo start`. Drivers' phones talk to Railway, so they no longer need to be on the laptop's Wi-Fi to send drives. The laptop still serves the app to Expo Go: use `npx expo start --tunnel` if the phone isn't on the same Wi-Fi.
 
-**An installable app:** run `npx eas-cli@latest build:configure` in `mobile/` (it links the app to an Expo account), add `EXPO_PUBLIC_API_URL` on the project's **Environment variables** page in the Expo dashboard, then:
+**An installable app:** run `npx eas-cli@latest build:configure` in `mobile/` (it links the app to an Expo account), then:
 
 - Android: `npx eas-cli@latest build --platform android --profile preview` gives a link to an `.apk` that anyone can install.
 - iPhone: needs an Apple Developer account, then `npx eas-cli@latest build --platform ios` and TestFlight.

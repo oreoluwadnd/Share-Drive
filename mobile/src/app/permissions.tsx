@@ -8,8 +8,7 @@ import { Page } from '../page';
 import { T } from '../theme';
 import { IconName, PrimaryButton, SecondaryButton, ui } from '../ui';
 
-// In Expo Go the permissions belong to the Expo Go app, not FairDrive.
-const APP = 'FairDrive (or Expo Go, while testing)';
+const APP = 'FairDrive';
 const STEPS = Platform.OS === 'ios'
   ? {
       location: [`Open Settings → ${APP} → Location.`, 'Choose "While Using the App" and turn on Precise Location.'],
