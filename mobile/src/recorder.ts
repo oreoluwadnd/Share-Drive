@@ -12,6 +12,13 @@ const MOTION_INTERVAL_MS = 20; // 50 readings a second
 
 export type Live = { seconds: number; km: number; kmh: number; gpsFixes: number };
 
+/** Location or motion access is off, so the app can show how to turn it on. */
+export class PermissionMissing extends Error {
+  constructor(readonly which: 'location' | 'motion') {
+    super(`${which === 'location' ? 'Location' : 'Motion'} access is off for this app.`);
+  }
+}
+
 export class Recorder {
   private motion: Reading[] = [];
   private gravity: Reading[] = [];
@@ -22,10 +29,10 @@ export class Recorder {
 
   async start(onLive: (live: Live) => void): Promise<void> {
     if ((await Location.requestForegroundPermissionsAsync()).status !== 'granted') {
-      throw new Error('Location is off for this app. Allow it in Settings, then try again.');
+      throw new PermissionMissing('location');
     }
     if ((await DeviceMotion.requestPermissionsAsync()).status !== 'granted') {
-      throw new Error('Motion access is off for this app. Allow it in Settings, then try again.');
+      throw new PermissionMissing('motion');
     }
     if (!(await DeviceMotion.isAvailableAsync())) {
       throw new Error("This phone doesn't report motion.");

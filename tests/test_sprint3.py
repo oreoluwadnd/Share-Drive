@@ -113,28 +113,27 @@ def test_sensor_noise_is_measured_only_while_stopped():
 # FD-26: Serve scores through an API
 
 @pytest.fixture
-def client(store, monkeypatch):
-    from fastapi.testclient import TestClient
+def client(store, make_client, monkeypatch):
     from fairdrive import api
-    monkeypatch.setattr(api, "store", store)
     monkeypatch.setattr(api, "tag_all", lambda store: [])  # tagging needs the internet; the shared trips are already tagged
-    api._cache.clear()
-    return TestClient(api.app)
+    return make_client(store)
 
 
 def test_score_and_explain_a_trip(client, store):
+    from tests.conftest import admin_headers
     trip_id = store.list()["trip_id"].iloc[0]
-    score = client.get(f"/trips/{trip_id}/score")
-    assert score.status_code == 200
-    body = score.json()
-    assert 0 <= body["driving_score"] <= 100 and 0 <= body["conditions_score"] <= 100 and "old_score" in body
-    explain = client.get(f"/trips/{trip_id}/explain").json()
-    assert len(explain["driving_reasons"]) == 3 and len(explain["conditions_reasons"]) == 3
+    trip = client.get(f"/admin/trips/{trip_id}", headers=admin_headers(client))
+    assert trip.status_code == 200
+    score = trip.json()["score"]
+    assert 0 <= score["driving_score"] <= 100 and 0 <= score["conditions_score"] <= 100 and "old_score" in score
+    reasons = trip.json()["reasons"]
+    assert len(reasons["driving_reasons"]) == 3 and len(reasons["conditions_reasons"]) == 3
 
 
 def test_score_lists_each_kind_of_harsh_moment_against_normal(client, store):
+    from tests.conftest import admin_headers
     trip_id = store.list()["trip_id"].iloc[2]  # driver0, normal driving, highway: 4 incidents in the scored km
-    moments = client.get(f"/trips/{trip_id}/score").json()["moments"]
+    moments = client.get(f"/admin/trips/{trip_id}", headers=admin_headers(client)).json()["score"]["moments"]
     assert [m["kind"] for m in moments] == ["hard_brake", "hard_accel", "hard_corner"]
     assert [m["label"] for m in moments] == ["Hard braking", "Sharp speeding up", "Sharp turns"]
     assert all(m["count"] == 4 and m["normal"] > 0 for m in moments), moments
@@ -142,29 +141,36 @@ def test_score_lists_each_kind_of_harsh_moment_against_normal(client, store):
 
 def test_upload_a_valid_trip(client, store, tmp_path):
     from tests import synthetic
+    from tests.conftest import sign_up
+    ana = sign_up(client, "Ana")
     path = synthetic.write(synthetic.to_records(synthetic.simulate(synthetic.city_drive(5))), tmp_path / "trip.json")
-    response = client.post("/trips", files={"file": ("trip.json", path.read_bytes())}, data={"driver": "ana"})
+    response = client.post("/trips", files={"file": ("trip.json", path.read_bytes())}, headers=ana["headers"])
     assert response.status_code == 201
     [trip] = response.json()["trips"]
-    assert trip["trip_id"].startswith("ana-") and trip["flag"] is None
+    assert trip["trip_id"].startswith(f"{ana['driver']['driver_id']}-") and trip["flag"] is None
     # Not tagged (tagging is switched off here), so it can't be scored yet, and the API says why.
-    not_yet = client.get(f"/trips/{trip['trip_id']}/score")
-    assert not_yet.status_code == 422 and "road, time and weather" in not_yet.json()["detail"]
+    not_yet = client.get(f"/me/trips/{trip['trip_id']}", headers=ana["headers"]).json()
+    assert not not_yet["scored"] and "road, time and weather" in not_yet["why"]
+
+
+def test_upload_needs_a_signed_in_driver(client):
+    assert client.post("/trips", files={"file": ("trip.json", b"{}")}).status_code == 401
 
 
 def test_invalid_file_is_a_400_naming_the_problem(client, store):
-    response = client.post("/trips", files={"file": ("trip.json", b"{}")}, data={"driver": "ana"})
+    from tests.conftest import sign_up
+    response = client.post("/trips", files={"file": ("trip.json", b"{}")}, headers=sign_up(client, "Ana")["headers"])
     assert response.status_code == 400
     assert "not a Sensor Logger JSON export" in response.json()["detail"]
 
 
 def test_unknown_trip_is_a_404(client):
-    assert client.get("/trips/nobody-20260101T000000Z/score").status_code == 404
+    from tests.conftest import sign_up
+    assert client.get("/me/trips/nobody-20260101T000000Z", headers=sign_up(client, "Ana")["headers"]).status_code == 404
 
 
 def test_tagged_trip_too_short_to_score_says_so(client, store):
-    from tests.conftest import add_tagged_trip
+    from tests.conftest import add_tagged_trip, admin_headers
     trip_id = add_tagged_trip(store, "shorty", "residential", 0.8, 0, 99, "calm")
-    response = client.get(f"/trips/{trip_id}/score")
-    assert response.status_code == 422
-    assert "less than 1 km" in response.json()["detail"]
+    trip = client.get(f"/admin/trips/{trip_id}", headers=admin_headers(client)).json()
+    assert not trip["scored"] and "less than 1 km" in trip["why"]

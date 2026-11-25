@@ -18,6 +18,10 @@ PARAMS = {"objective": "poisson", "learning_rate": 0.05, "num_leaves": 7, "min_d
 ROUNDS = 150
 
 
+class NotEnoughTrips(ValueError):
+    """There aren't yet the tagged trips from at least 2 drivers that scoring needs."""
+
+
 @dataclass
 class ContextModel:
     boosters: dict[str, lgb.Booster]
@@ -50,7 +54,7 @@ def training_segments(store: TripStore) -> pd.DataFrame:
             segs = segments(store.points(trip.trip_id), details)
             parts.append(segs.assign(trip_id=trip.trip_id, driver=trip.driver))
     if not parts:
-        raise ValueError("No tagged trips to learn from. Run `fairdrive tag` first.")
+        raise NotEnoughTrips("No tagged trips to learn from. Run `fairdrive tag` first.")
     return pd.concat(parts, ignore_index=True)
 
 
@@ -70,7 +74,7 @@ def held_out_expected(segs: pd.DataFrame) -> pd.DataFrame:
     """
     drivers = segs["driver"].unique()
     if len(drivers) < 2:
-        raise ValueError("Need trips from at least 2 drivers to know what is normal without the driver being scored.")
+        raise NotEnoughTrips("Need trips from at least 2 drivers to know what is normal without the driver being scored.")
     parts = [fit(segs[segs["driver"] != d]).expected(segs[segs["driver"] == d]) for d in drivers]
     return pd.concat(parts).reindex(segs.index)
 

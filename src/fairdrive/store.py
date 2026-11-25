@@ -66,6 +66,11 @@ class TripStore:
     def details(self, trip_id: str) -> dict:
         return json.loads((self.trips_dir / f"{trip_id}.json").read_text())
 
+    def delete(self, trip_id: str) -> None:
+        """Remove a trip's details and points."""
+        (self.trips_dir / f"{trip_id}.json").unlink()
+        (self.trips_dir / f"{trip_id}.parquet").unlink(missing_ok=True)
+
     def update(self, trip_id: str, details: dict, points: pd.DataFrame) -> None:
         """Replace a trip's details and points (used when adding tags)."""
         points.to_parquet(self.trips_dir / f"{trip_id}.parquet")

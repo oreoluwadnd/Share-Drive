@@ -1,62 +1,10 @@
-// Moving pieces: the road with a driving car, the score ring that fills up, and sections that slide in.
+// Moving pieces: the score ring that fills up, and sections that slide in.
 
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
 
 import { T } from './theme';
-
-const DASH = 26, GAP = 22, PERIOD = DASH + GAP;
-
-/** A road whose lane lines move under a bobbing car. Faster driving moves the lines faster. */
-export function DrivingRoad({ kmh }: { kmh: number }) {
-  const lines = useRef(new Animated.Value(0)).current;
-  const bob = useRef(new Animated.Value(0)).current;
-  // Round the speed so the loop only restarts when the pace visibly changes.
-  const pace = Math.max(10, Math.round(kmh / 10) * 10);
-
-  useEffect(() => {
-    lines.setValue(0);
-    const loop = Animated.loop(Animated.timing(lines, { toValue: 1, duration: 9000 / pace, easing: Easing.linear, useNativeDriver: true }));
-    loop.start();
-    return () => loop.stop();
-  }, [lines, pace]);
-
-  useEffect(() => {
-    const loop = Animated.loop(Animated.sequence([
-      Animated.timing(bob, { toValue: -3, duration: 260, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-      Animated.timing(bob, { toValue: 0, duration: 260, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-    ]));
-    loop.start();
-    return () => loop.stop();
-  }, [bob]);
-
-  const shift = lines.interpolate({ inputRange: [0, 1], outputRange: [0, -PERIOD] });
-  return (
-    <View style={road.box}>
-      <LinearGradient colors={['#2A2F3A', '#16191F']} style={road.asphalt}>
-        <Animated.View style={[road.lane, { transform: [{ translateX: shift }] }]}>
-          {Array.from({ length: 14 }, (_, i) => <View key={i} style={road.dash} />)}
-        </Animated.View>
-        <Animated.View style={[road.car, { transform: [{ translateY: bob }] }]}>
-          <View style={road.shadow} />
-          <MaterialCommunityIcons name="car-side" size={64} color={T.ring.good[0]} />
-        </Animated.View>
-      </LinearGradient>
-    </View>
-  );
-}
-
-const road = StyleSheet.create({
-  box: { borderRadius: 28, overflow: 'hidden', ...T.cardShadow },
-  asphalt: { height: 120, justifyContent: 'flex-end' },
-  lane: { position: 'absolute', top: 88, left: 0, flexDirection: 'row', gap: GAP },
-  dash: { width: DASH, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.75)' },
-  car: { position: 'absolute', left: '50%', marginLeft: -32, top: 22, alignItems: 'center' },
-  shadow: { position: 'absolute', bottom: 6, width: 52, height: 8, borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.35)' },
-});
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 

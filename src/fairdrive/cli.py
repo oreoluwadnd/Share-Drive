@@ -3,10 +3,12 @@ import json
 import os
 import subprocess
 import sys
+from getpass import getpass
 from pathlib import Path
 
 import pandas as pd
 
+from fairdrive.accounts import Accounts
 from fairdrive.baseline import driver_scores
 from fairdrive.braking import study
 from fairdrive.compare import comparison
@@ -27,7 +29,8 @@ API_PORT = 8000
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="fairdrive")
-    parser.add_argument("--data-dir", type=Path, default=Path("data"), help="where trips are stored (default: data)")
+    parser.add_argument("--data-dir", type=Path, default=Path(os.environ.get("FAIRDRIVE_DATA", "data")),
+                        help="where trips and accounts are stored (default: $FAIRDRIVE_DATA, else data)")
     commands = parser.add_subparsers(dest="command", required=True)
 
     upload_cmd = commands.add_parser("upload", help="upload a Sensor Logger JSON export")
@@ -49,6 +52,8 @@ def main(argv: list[str] | None = None) -> None:
     commands.add_parser("leakage", help="does the driving score give away the road type or darkness?")
     commands.add_parser("phones", help="sensor noise and score spread per phone model")
     commands.add_parser("dashboard", help="open the dashboard in the browser")
+    admin_cmd = commands.add_parser("add-admin", help="create an admin account for the web dashboard (asks for a password)")
+    admin_cmd.add_argument("email")
     commands.add_parser("api", help=f"serve scores on port {API_PORT} to this computer and phones on the same Wi-Fi (docs at /docs)")
 
     args = parser.parse_args(argv)
@@ -115,6 +120,15 @@ def main(argv: list[str] | None = None) -> None:
     elif args.command == "dashboard":
         env = {**os.environ, "FAIRDRIVE_DATA": str(args.data_dir.resolve())}
         subprocess.run([sys.executable, "-m", "streamlit", "run", str(APP)], env=env, check=True)
+    elif args.command == "add-admin":
+        password = getpass("Password: ")
+        if getpass("Same password again: ") != password:
+            sys.exit("error: the passwords didn't match. No admin was added.")
+        try:
+            Accounts(args.data_dir / "admins.json").add(args.email, password)
+        except ValueError as error:
+            sys.exit(f"error: {error}")
+        print(f"Added admin {args.email.strip().lower()}")
     elif args.command == "api":
         env = {**os.environ, "FAIRDRIVE_DATA": str(args.data_dir.resolve())}
         subprocess.run([sys.executable, "-m", "uvicorn", "fairdrive.api:app", "--host", "0.0.0.0", "--port", str(API_PORT)], env=env, check=True)

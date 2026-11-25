@@ -49,6 +49,7 @@ uv run fairdrive phones                               # sensor noise and score s
 uv run fairdrive braking-study path/to/UAH-DRIVESET-v1 # can the phone tell planned stops from panic stops?
 uv run fairdrive dashboard                            # the web dashboard
 uv run fairdrive api                                  # scores over HTTP on port 8000 (docs at http://localhost:8000/docs)
+uv run fairdrive add-admin you@example.com            # admin account for the web dashboard (asks for a password)
 ```
 
 `tag` can be re-run any time. It skips trips that are done and fills in weather that Environment Canada hadn't published yet (it runs a few days behind).
@@ -70,13 +71,22 @@ unzip -q UAH-DRIVESET-v1.zip '*.txt' -d uah-text
 
 ## API
 
+Drivers sign up in the phone app. Every call except sign up and sign in needs the token it returns. The full list is at the top of `src/fairdrive/api.py`.
+
 ```
-curl -F driver=ana -F file=@recording.json localhost:8000/trips    # upload, then add road, time and weather
-curl localhost:8000/trips/<trip_id>/score                           # driving, conditions and old score
-curl localhost:8000/trips/<trip_id>/explain                         # three reasons for each score
+curl -X POST localhost:8000/auth/signup -H 'Content-Type: application/json' \
+     -d '{"name": "Ana", "email": "ana@example.com", "password": "at least 8 chars"}'   # -> {"token": ...}
+curl -H "Authorization: Bearer $TOKEN" -F file=@recording.json localhost:8000/trips   # upload, then add road, time and weather
+curl -H "Authorization: Bearer $TOKEN" localhost:8000/me/trips                       # your trips, with scores
+curl -H "Authorization: Bearer $TOKEN" localhost:8000/me/trips/<trip_id>             # one trip: scores, reasons and route
+curl -H "Authorization: Bearer $TOKEN" -X DELETE localhost:8000/me                   # delete the account and all its trips
 ```
 
-A file that can't be used gets a 400 that names the problem.
+A file that can't be used gets a 400 that names the problem. Drivers only ever see their own trips. Passwords are stored only as salted hashes (`data/drivers.json`, `data/admins.json`), and sign-ins are saved in `data/sessions.json` (only a hash of each token), so restarting the API doesn't sign anyone out. A driver stays signed in for 90 days, an admin for 12 hours.
+
+The landing page and the admin web dashboard (every trip, with scores, reasons and route) are the same Expo app opened in a browser; see `mobile/README.md`.
+
+**Deploying:** GitHub Actions (`.github/workflows/ci.yml`) checks every pull request, and on `main` deploys the API to Railway (`Dockerfile`) and the landing page and admin dashboard to Vercel (`mobile/vercel.json`). One-time setup in `docs/deploy.md`.
 
 ## Recording a drive
 

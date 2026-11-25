@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true
     },
@@ -19,7 +19,8 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "output": "single"
     },
     "plugins": [
       [
@@ -34,7 +35,10 @@
           "motionPermission": "FairDrive records braking, speeding up and turning while you drive."
         }
       ],
-      "expo-sharing"
-    ]
+      "expo-sharing",
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "scheme": "fairdrive"
   }
 }
