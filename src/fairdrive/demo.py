@@ -44,8 +44,8 @@ STYLES = {
     "normal": {"share": 0.6, "accel": 1.1, "brake": 1.1, "corner": 1.15, "ease": 0.7, "pace": 1.0},
     "aggressive": {"share": 0.15, "accel": 1.9, "brake": 2.0, "corner": 1.7, "ease": 1.0, "pace": 1.08},
 }
-PHONES = [("iPhone 15", "iOS"), ("iPhone 14", "iOS"), ("iPhone 13", "iOS"), ("Pixel 8", "Android"),
-          ("Galaxy S23", "Android"), ("Galaxy A54", "Android")]
+PHONES = [("iPhone 15", "ios"), ("iPhone 14", "ios"), ("iPhone 13", "ios"), ("Pixel 8", "android"),  # as the app records Platform.OS
+          ("Galaxy S23", "android"), ("Galaxy A54", "android")]
 FIRST_NAMES = ["Amara", "Liam", "Priya", "Noah", "Mei", "Ethan", "Fatima", "Lucas", "Chloe", "Mateo", "Aisha", "Owen",
                "Sofia", "Daniel", "Zara", "Jacob", "Leila", "Ryan", "Hana", "Marcus", "Ines", "Kwame", "Grace", "Arjun",
                "Olivia", "Tariq", "Emily", "Diego", "Nadia", "Samuel", "Yuki", "Isaac", "Maya", "Felix", "Ada", "Omar"]
