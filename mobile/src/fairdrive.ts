@@ -8,8 +8,9 @@ export type Moment = { kind: string; label: string; count: number; normal: numbe
 export type Score = { driving_score: number; conditions_score: number; old_score: number; km: number; moments: Moment[] };
 export type Reasons = { driving_reasons: string[]; conditions_reasons: string[] };
 export type Phone = { device: string; platform: string } | null;
-export type Driver = { email: string; name: string; driver_id: string; company_id: string | null };
 export type InsuranceCompany = { company_id: string; name: string };
+/** company: the driver's insurer while it uses FairDrive, else null. */
+export type Driver = { email: string; name: string; driver_id: string; company: InsuranceCompany | null };
 export type Session = { token: string; driver: Driver };
 
 export type TripRow = {
@@ -65,6 +66,11 @@ export const signIn = (email: string, password: string) =>
   request<{ token: string; driver: Driver }>('/auth/login', { method: 'POST', body: { email, password } });
 
 export const signOut = (session: Session) => request<void>('/auth/logout', { method: 'POST', token: session.token });
+
+export const me = (session: Session) => request<Driver>('/me', { token: session.token });
+
+export const chooseCompany = (session: Session, companyId: string) =>
+  request<Driver>('/me/company', { method: 'PUT', token: session.token, body: { company_id: companyId } });
 
 export const deleteAccount = (session: Session) => request<void>('/me', { method: 'DELETE', token: session.token });
 

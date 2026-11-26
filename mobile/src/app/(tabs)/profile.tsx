@@ -3,10 +3,12 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Constants from 'expo-constants';
 import { Href, router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FONT } from '../../brand';
+import { CompanyPicker } from '../../company-picker';
+import { chooseCompany, Driver, me } from '../../fairdrive';
 import { Page } from '../../page';
 import { useSession, useSignedIn } from '../../session';
 import { T } from '../../theme';
@@ -15,8 +17,17 @@ import { IconName, ui } from '../../ui';
 
 export default function Profile() {
   const session = useSignedIn();
-  const { signOut } = useSession();
+  const { signOut, call } = useSession();
   const [error, setError] = useState('');
+  // Fresh from the server: the insurer can change after sign-in (a company removed the driver, or stopped using FairDrive).
+  const [driver, setDriver] = useState<Driver | null>(null);
+
+  useEffect(() => { call(me).then(setDriver).catch((e) => setError((e as Error).message)); }, [call]);
+
+  function choose(companyId: string) {
+    setError('');
+    call((session) => chooseCompany(session, companyId)).then(setDriver).catch((e) => setError((e as Error).message));
+  }
 
   return (
     <Page>
@@ -28,6 +39,20 @@ export default function Profile() {
           <Text style={ui.muted}>{session.driver.email}</Text>
         </View>
       </View>
+
+      {driver?.company && (
+        <View style={[ui.card, s.list]}>
+          <Row icon="shield-car" label="Insurance company" detail={driver.company.name} />
+        </View>
+      )}
+      {driver && !driver.company && (
+        <View style={ui.card}>
+          <Text style={ui.cardTitle}>Choose your insurance company</Text>
+          <Text style={ui.muted}>Your insurer sees your trips and scores. You can choose once.</Text>
+          <View style={ui.cardDivider} />
+          <CompanyPicker value={null} onChange={(c) => choose(c.company_id)} />
+        </View>
+      )}
 
       <View style={[ui.card, s.list]}>
         <Row icon="shield-lock-outline" label="Privacy" href="/privacy" />

@@ -63,7 +63,21 @@ def test_sign_up_lists_only_approved_companies(client):
     add_company("Beta Cover")
     assert client.get("/companies").json()["companies"] == [
         {"company_id": "c-acme", "name": "Acme Insurance"}, {"company_id": "c-beta", "name": "Beta Cover"}]
-    assert sign_up(client, "Ana", "c-beta")["driver"]["company_id"] == "c-beta"
+    assert sign_up(client, "Ana", "c-beta")["driver"]["company"] == {"company_id": "c-beta", "name": "Beta Cover"}
+
+
+def test_a_driver_without_an_insurer_chooses_one(client, store):
+    from fairdrive import api
+    ana = sign_up(client, "Ana")
+    api.drivers.update("ana@example.com", company_id=None)  # an account from before companies, or removed by one
+    assert client.get("/me", headers=ana["headers"]).json()["company"] is None
+    add_company("Beta Cover")
+    assert client.put("/me/company", json={"company_id": "c-made-up"}, headers=ana["headers"]).status_code == 400
+    chosen = client.put("/me/company", json={"company_id": "c-beta"}, headers=ana["headers"])
+    assert chosen.status_code == 200 and chosen.json()["company"]["name"] == "Beta Cover"
+    assert client.get("/me", headers=ana["headers"]).json()["driver_id"] == ana["driver"]["driver_id"]  # same account
+    again = client.put("/me/company", json={"company_id": "c-acme"}, headers=ana["headers"])
+    assert again.status_code == 409 and "already" in again.json()["detail"]
 
 
 def test_an_admin_token_is_not_a_driver_token(client):

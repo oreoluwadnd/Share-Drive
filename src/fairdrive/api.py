@@ -12,7 +12,8 @@ Drivers (phone app):
 POST   /auth/signup             {name, email, password, company_id} -> {token, driver}
 POST   /auth/login              {email, password} -> {token, driver}
 POST   /auth/logout             ends this sign-in
-GET    /me                      the signed-in driver
+GET    /me                      the signed-in driver, with their insurance company (null if none)
+PUT    /me/company              {company_id}: choose an insurance company, for a driver who has none
 DELETE /me                      deletes the driver's account and every trip they uploaded
 POST   /trips                   upload a Sensor Logger JSON export (form field: file); adds road, time and weather
 GET    /me/trips                the driver's trips, newest first, with scores and harsh moments
@@ -98,7 +99,7 @@ def sign_up(form: SignUp) -> dict:
         raise HTTPException(409, f"{error}. Sign in instead.")
     except ValueError as error:
         raise HTTPException(400, str(error))
-    return {"token": sessions.start("driver", driver["email"], DRIVER_SESSION_SECONDS), "driver": driver}
+    return {"token": sessions.start("driver", driver["email"], DRIVER_SESSION_SECONDS), "driver": _driver_view(driver)}
 
 
 @app.post("/auth/login")
@@ -106,7 +107,7 @@ def sign_in(login: Login) -> dict:
     driver = drivers.check(login.email, login.password)
     if driver is None:
         raise HTTPException(401, "Wrong email or password")
-    return {"token": sessions.start("driver", driver["email"], DRIVER_SESSION_SECONDS), "driver": driver}
+    return {"token": sessions.start("driver", driver["email"], DRIVER_SESSION_SECONDS), "driver": _driver_view(driver)}
 
 
 def _token(authorization: str | None = Header(default=None)) -> str:
@@ -128,7 +129,29 @@ def sign_out(token: str = Depends(_token), _: dict = Depends(_driver)) -> None:
 
 @app.get("/me")
 def me(driver: dict = Depends(_driver)) -> dict:
-    return driver
+    return _driver_view(driver)
+
+
+class Choice(BaseModel):
+    company_id: str
+
+
+@app.put("/me/company")
+def choose_company(choice: Choice, driver: dict = Depends(_driver)) -> dict:
+    """For drivers without an insurer: older accounts, or ones a company removed."""
+    if _driver_view(driver)["company"] is not None:
+        raise HTTPException(409, "You already have an insurance company")
+    if choice.company_id not in {c["company_id"] for c in _approved_companies()}:
+        raise HTTPException(400, "Choose your insurance company")
+    return _driver_view(drivers.update(driver["email"], company_id=choice.company_id))
+
+
+def _driver_view(driver: dict) -> dict:
+    """The driver as the app sees them. `company` is their insurer while it is approved, else None."""
+    approved = {c["company_id"]: c["name"] for c in _approved_companies()}
+    company_id = driver.get("company_id")
+    company = {"company_id": company_id, "name": approved[company_id]} if company_id in approved else None
+    return {"email": driver["email"], "name": driver["name"], "driver_id": driver["driver_id"], "company": company}
 
 
 @app.delete("/me", status_code=204)
