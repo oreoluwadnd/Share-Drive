@@ -1,6 +1,7 @@
 """Context model (FD-16): how many harsh events per km are normal for a given road, time and weather."""
 
 import json
+import zlib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,6 +17,8 @@ from fairdrive.store import TripStore
 PARAMS = {"objective": "poisson", "learning_rate": 0.05, "num_leaves": 7, "min_data_in_leaf": 30,
           "verbose": -1, "seed": 0, "deterministic": True, "force_row_wise": True}
 ROUNDS = 150
+# Models trained to score held-out drivers. Each driver's trips are scored by one that never saw them.
+MAX_FOLDS = 10
 
 
 class NotEnoughTrips(ValueError):
@@ -51,7 +54,7 @@ def training_segments(store: TripStore) -> pd.DataFrame:
     for trip in trips[trips["flag"].isna()].itertuples():
         details = store.details(trip.trip_id)
         if is_tagged(details):
-            segs = segments(store.points(trip.trip_id), details)
+            segs = store.remembered("segments", trip.trip_id, lambda: segments(store.points(trip.trip_id), details))
             parts.append(segs.assign(trip_id=trip.trip_id, driver=trip.driver))
     if not parts:
         raise NotEnoughTrips("No tagged trips to learn from. Run `fairdrive tag` first.")
@@ -71,11 +74,14 @@ def held_out_expected(segs: pd.DataFrame) -> pd.DataFrame:
 
     A model that has seen a trip partly memorises its harsh moments: on UAH-DriveSet the in-sample
     expected rate followed each trip's own rate (correlation 0.61), the held-out one did not (-0.02).
+    Up to MAX_FOLDS drivers, each driver is left out on their own. Beyond that, drivers are split into
+    MAX_FOLDS fixed groups and each group is left out together, so the work stops growing with every driver.
     """
     drivers = segs["driver"].unique()
     if len(drivers) < 2:
         raise NotEnoughTrips("Need trips from at least 2 drivers to know what is normal without the driver being scored.")
-    parts = [fit(segs[segs["driver"] != d]).expected(segs[segs["driver"] == d]) for d in drivers]
+    folds = segs["driver"] if len(drivers) <= MAX_FOLDS else segs["driver"].map(lambda d: zlib.crc32(d.encode()) % MAX_FOLDS)
+    parts = [fit(segs[folds != f]).expected(segs[folds == f]) for f in folds.unique()]
     return pd.concat(parts).reindex(segs.index)
 
 

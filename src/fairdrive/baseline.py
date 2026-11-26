@@ -11,7 +11,8 @@ def trip_scores(store: TripStore) -> pd.DataFrame:
     """One row per scorable trip. score is 50 at the average events per km of all stored trips, 100 with none."""
     trips = store.list()
     trips = trips[trips["flag"].isna()]
-    rows = [{"trip_id": t.trip_id, "driver": t.driver, "distance_km": t.distance_km, **count_events(store.points(t.trip_id))}
+    rows = [{"trip_id": t.trip_id, "driver": t.driver, "distance_km": t.distance_km,
+             **store.remembered("events", t.trip_id, lambda: count_events(store.points(t.trip_id)))}
             for t in trips.itertuples()]
     scores = pd.DataFrame(rows, columns=["trip_id", "driver", "distance_km", *EVENT_TYPES])
     scores["events_per_km"] = scores[list(EVENT_TYPES)].sum(axis=1) / scores["distance_km"]

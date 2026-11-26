@@ -13,6 +13,7 @@ import { CompaniesPage, DriversPage, TeamPage, useLoad } from './admin-pages';
 import { Button, FilterChip, Input, s, Stat, TextLink, WIDE, Wordmark } from './admin-ui';
 import { C, useBrandFonts } from './brand';
 import { LoggedOut } from './fairdrive';
+import { storage } from './storage';
 import { ScoredTrip } from './score';
 import { average, Avatar, NotScoredBadge, phoneName, RouteCard, ScoreBadge, sentence, when } from './trip-parts';
 
@@ -22,15 +23,19 @@ const TAB_LABELS: Record<Tab, string> = { trips: 'Trips', drivers: 'Drivers', te
 /** inviteCode: from a team invite link (/admin?invite=CODE). onInviteUsed clears it once the person has joined. */
 export default function AdminApp({ onHome, inviteCode, onInviteUsed }: { onHome: () => void; inviteCode?: string; onInviteUsed: () => void }) {
   const fontsReady = useBrandFonts();
-  const [session, setSession] = useState<Session | null>(null);
+  // undefined until the saved login (if any) has been read.
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [tab, setTab] = useState<Tab>('trips');
   const [openTrip, setOpenTrip] = useState<string | null>(null);
-  const logOut = () => { setSession(null); setOpenTrip(null); setTab('trips'); };
-  if (!fontsReady) return <View style={s.root} />;
+
+  useEffect(() => { storage.get('admin').then((saved) => setSession(saved ? JSON.parse(saved) : null)); }, []);
+  const logIn = (next: Session) => { storage.set('admin', JSON.stringify(next)); setSession(next); };
+  const logOut = () => { storage.remove('admin'); setSession(null); setOpenTrip(null); setTab('trips'); };
+  if (!fontsReady || session === undefined) return <View style={s.root} />;
 
   if (!session) {
-    if (inviteCode) return <Join code={inviteCode} onJoined={(next) => { onInviteUsed(); setSession(next); }} onHome={onHome} />;
-    return <LoggedOutPages onLogin={setSession} onHome={onHome} />;
+    if (inviteCode) return <Join code={inviteCode} onJoined={(next) => { onInviteUsed(); logIn(next); }} onHome={onHome} />;
+    return <LoggedOutPages onLogin={logIn} onHome={onHome} />;
   }
   const { account } = session;
   const tabs: Tab[] = ['trips', 'drivers', ...(account.role === 'owner' ? ['team' as const] : []), ...(account.role === 'super' ? ['companies' as const] : [])];

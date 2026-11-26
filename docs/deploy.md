@@ -71,7 +71,7 @@ tail -f /data/seed.log                     # Ctrl+C stops watching, not the seed
 
 The end of `/data/seed.log` lists the owners' logins and the one password every demo driver shares; they are also kept in `/data/demo.json`. If the seed stops on a network error, run the same command again: it adds only the drivers still missing and tags only untagged trips. Demo drivers count towards what is normal, like any other driver.
 
-With 150 drivers, scoring everything takes about a minute (47 s on a test machine), and it reruns after any trip is added. So the first dashboard or app load after a new trip is slow.
+Scoring remembers each trip's work and uses at most 10 models, so with 150 drivers a new trip is scored in about 2 seconds. Right after a deploy the server works out every score in the background (about 30 s for 150 drivers).
 
 The super admin approves insurance companies under **Companies** on the dashboard. Super admins live in `/data/staff.json`; an account made before companies existed (in `/data/admins.json`) no longer logs in, so run `fairdrive add-admin` again.
 

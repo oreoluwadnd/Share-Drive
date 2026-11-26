@@ -36,7 +36,9 @@ POST   /admin/companies/{id}/approve, /reject    super admin
 import os
 import secrets
 import tempfile
+import threading
 import urllib.error
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import pandas as pd
@@ -61,7 +63,17 @@ drivers = Accounts(store.root / "drivers.json")
 companies = Companies(store.root / "companies.json")
 invites = Invites(store.root / "invites.json")
 sessions = Sessions(store.root / "sessions.json")
-app = FastAPI(title="FairDrive", description="Driving scores that judge you against what is normal for your roads, time and weather.")
+
+
+@asynccontextmanager
+async def _warm_up(_: FastAPI):
+    """Score everything in the background as the server starts, so the first visitor after a deploy doesn't wait."""
+    threading.Thread(target=_scores, daemon=True).start()
+    yield
+
+
+app = FastAPI(title="FairDrive", description="Driving scores that judge you against what is normal for your roads, time and weather.",
+              lifespan=_warm_up)
 # The web dashboard is served from another port. Calls carry a bearer token, not cookies, so any origin is safe.
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 _cache: dict[tuple, pd.DataFrame] = {}
