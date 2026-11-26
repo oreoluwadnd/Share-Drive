@@ -50,6 +50,7 @@ uv run fairdrive braking-study path/to/UAH-DRIVESET-v1 # can the phone tell plan
 uv run fairdrive dashboard                            # the web dashboard
 uv run fairdrive api                                  # scores over HTTP on port 8000 (docs at http://localhost:8000/docs)
 uv run fairdrive add-admin you@example.com            # FairDrive super admin for the web dashboard (asks for a password)
+uv run fairdrive seed-demo                            # demo companies, and 150 drivers with trips on London, Ontario roads
 ```
 
 `tag` can be re-run any time. It skips trips that are done and fills in weather that Environment Canada hadn't published yet (it runs a few days behind).

@@ -6,11 +6,14 @@ import sys
 from getpass import getpass
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from fairdrive.accounts import Accounts
 from fairdrive.baseline import driver_scores
 from fairdrive.braking import study
+from fairdrive import demo
+from fairdrive.companies import Companies
 from fairdrive.compare import comparison
 from fairdrive.leakage import TARGET_GAP_REDUCTION_PCT, leakage
 from fairdrive.model import model_dir, train
@@ -55,6 +58,10 @@ def main(argv: list[str] | None = None) -> None:
     admin_cmd = commands.add_parser("add-admin", help="create a FairDrive super admin for the web dashboard: approves companies, sees everything (asks for a password)")
     admin_cmd.add_argument("email")
     commands.add_parser("api", help=f"serve scores on port {API_PORT} to this computer and phones on the same Wi-Fi (docs at /docs)")
+    seed_cmd = commands.add_parser("seed-demo", help="add demo insurance companies and drivers with trips on London, Ontario roads "
+                                                     "(needs internet; about 20 minutes for 150 drivers)")
+    seed_cmd.add_argument("--drivers", type=int, default=150)
+    seed_cmd.add_argument("--trips", type=int, default=3, help="trips per driver")
 
     args = parser.parse_args(argv)
     store = TripStore(args.data_dir)
@@ -129,6 +136,14 @@ def main(argv: list[str] | None = None) -> None:
         except ValueError as error:
             sys.exit(f"error: {error}")
         print(f"Added super admin {args.email.strip().lower()}")
+    elif args.command == "seed-demo":
+        root = args.data_dir
+        logins = demo.seed(store, Accounts(root / "staff.json"), Accounts(root / "drivers.json"), Companies(root / "companies.json"),
+                           args.drivers, args.trips, np.random.default_rng())
+        print("\nNew insurance company owners (dashboard):")
+        for owner in logins["owners"]:
+            print(f"  {owner['company']}: {owner['email']}  {owner['password']}")
+        print(f"Every demo driver (app) has the password {logins['driver_password']}. Their emails: Drivers tab on the dashboard.")
     elif args.command == "api":
         env = {**os.environ, "FAIRDRIVE_DATA": str(args.data_dir.resolve())}
         subprocess.run([sys.executable, "-m", "uvicorn", "fairdrive.api:app", "--host", "0.0.0.0", "--port", str(API_PORT)], env=env, check=True)

@@ -47,6 +47,7 @@ railway volume files upload uah-text.tgz /uah-text.tgz
 Then open a shell on the server with `railway ssh` and run:
 
 ```
+export PATH=/app/.venv/bin:$PATH           # railway ssh doesn't get the image's PATH, so `fairdrive` isn't found without it
 ls /data                                   # uah-text.tgz should be here
 mkdir -p /data/uah-text && tar xzf /data/uah-text.tgz -C /data/uah-text
 fairdrive load-uah /data/uah-text/UAH-DRIVESET-v1
@@ -57,6 +58,18 @@ fairdrive add-admin you@example.com        # the FairDrive super admin; asks for
 ```
 
 On the server, `fairdrive` commands use `/data` by themselves (the image sets `FAIRDRIVE_DATA=/data`). If `uah-text.tgz` isn't in `/data`, `railway volume browse` shows where the upload went.
+
+### Demo data (optional)
+
+For a demo, `fairdrive seed-demo` adds 4 made-up insurance companies (each with an owner login) and 150 drivers with 3 trips each on real London, Ontario roads, split 40% to TD Insurance (if it exists) and the rest evenly. Routes come from the public OSRM router; each driver is calm, normal or aggressive, and the trips are tagged with real roads, time of day and Environment Canada weather. It takes about 25 minutes, so run it in the background:
+
+```
+export PATH=/app/.venv/bin:$PATH
+nohup fairdrive seed-demo > /data/seed.log 2>&1 &
+tail -f /data/seed.log                     # Ctrl+C stops watching, not the seed
+```
+
+The end of `/data/seed.log` lists the new owners' logins and the one password every demo driver shares. Demo drivers count towards what is normal, like any other driver.
 
 The super admin approves insurance companies under **Companies** on the dashboard. Super admins live in `/data/staff.json`; an account made before companies existed (in `/data/admins.json`) no longer logs in, so run `fairdrive add-admin` again.
 
