@@ -69,7 +69,9 @@ nohup fairdrive seed-demo > /data/seed.log 2>&1 &
 tail -f /data/seed.log                     # Ctrl+C stops watching, not the seed
 ```
 
-The end of `/data/seed.log` lists the new owners' logins and the one password every demo driver shares. Demo drivers count towards what is normal, like any other driver.
+The end of `/data/seed.log` lists the owners' logins and the one password every demo driver shares; they are also kept in `/data/demo.json`. If the seed stops on a network error, run the same command again: it adds only the drivers still missing and tags only untagged trips. Demo drivers count towards what is normal, like any other driver.
+
+With 150 drivers, scoring everything takes about a minute (47 s on a test machine), and it reruns after any trip is added. So the first dashboard or app load after a new trip is slow.
 
 The super admin approves insurance companies under **Companies** on the dashboard. Super admins live in `/data/staff.json`; an account made before companies existed (in `/data/admins.json`) no longer logs in, so run `fairdrive add-admin` again.
 

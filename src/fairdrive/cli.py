@@ -140,7 +140,7 @@ def main(argv: list[str] | None = None) -> None:
         root = args.data_dir
         logins = demo.seed(store, Accounts(root / "staff.json"), Accounts(root / "drivers.json"), Companies(root / "companies.json"),
                            args.drivers, args.trips, np.random.default_rng())
-        print("\nNew insurance company owners (dashboard):")
+        print("\nDemo insurance company owners (dashboard):")
         for owner in logins["owners"]:
             print(f"  {owner['company']}: {owner['email']}  {owner['password']}")
         print(f"Every demo driver (app) has the password {logins['driver_password']}. Their emails: Drivers tab on the dashboard.")

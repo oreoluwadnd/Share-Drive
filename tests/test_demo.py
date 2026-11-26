@@ -71,3 +71,34 @@ def test_drivers_are_spread_over_companies_with_the_main_one_largest(tmp_path):
     assigned = pd.Series(demo._assign(made, 150, companies)).value_counts()
     assert assigned["c-td"] == 60 and assigned.drop("c-td").between(22, 23).all()
     assert demo._companies(staff, companies)["new_owners"] == []  # running again adds no companies
+
+
+def offline_seed(monkeypatch, tmp_path, n, tag=lambda store, roads: []):
+    """seed() with the router, the road download and tagging replaced, so it runs without a network."""
+    from fairdrive.store import TripStore
+    monkeypatch.setattr(demo, "_city_roads", lambda: [])
+    monkeypatch.setattr(demo, "_route", lambda rng: corner_route())
+    monkeypatch.setattr(demo, "tag_all", tag)
+    store = TripStore(tmp_path)
+    accounts = Accounts(tmp_path / "staff.json"), Accounts(tmp_path / "drivers.json"), Companies(tmp_path / "companies.json")
+    return demo.seed(store, *accounts, n, 1, np.random.default_rng(n)), store, accounts
+
+
+def test_a_second_run_adds_only_the_missing_drivers_and_keeps_the_logins(monkeypatch, tmp_path):
+    first, store, (staff, drivers, _) = offline_seed(monkeypatch, tmp_path, 3)
+    second, _, _ = offline_seed(monkeypatch, tmp_path, 5)  # as if the first run had been asked for 5 and stopped at 3
+    assert second == first | {"owners": first["owners"]}
+    assert len(drivers.all()) == 5 and len({d["email"] for d in drivers.all()}) == 5
+    assert len(store.list()) == 5 and all(drivers.check(d["email"], first["driver_password"]) for d in drivers.all())
+    assert (tmp_path / "demo.json").exists()
+
+
+def test_trips_outside_london_get_the_normal_road_lookup(monkeypatch, tmp_path):
+    asked = []
+    monkeypatch.setattr(demo, "fetch_roads", lambda lat, lon: asked.append("osm") or [])
+    def tag(store, roads):
+        roads(np.array([42.98, 42.99]), np.array([-81.25, -81.24]))  # London: the download
+        roads(np.array([43.65, 43.66]), np.array([-79.39, -79.38]))  # Toronto: OpenStreetMap
+        return []
+    offline_seed(monkeypatch, tmp_path, 1, tag)
+    assert asked == ["osm"]

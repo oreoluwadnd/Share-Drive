@@ -65,25 +65,35 @@ NOISE_MS2 = 0.05
 
 def seed(store: TripStore, staff: Accounts, drivers: Accounts, companies: Companies, n_drivers: int, trips_per_driver: int,
          rng: np.random.Generator) -> dict:
-    """Adds the companies, drivers and trips, then tags the trips. Returns the logins it made."""
+    """Adds the companies, drivers and trips, then tags the trips. Returns every demo login.
+
+    Safe to run again after a failure (a network error, say): it adds only the drivers still missing and
+    tags only trips not yet tagged. Logins are kept in <data>/demo.json as soon as they are made.
+    """
     city_ways = _city_roads()  # first: if OpenStreetMap doesn't answer, nothing has been added yet
     print(f"{len(city_ways)} London roads loaded")
+    logins_file = store.root / "demo.json"
+    logins = json.loads(logins_file.read_text()) if logins_file.exists() else {"driver_password": _password(), "owners": []}
     company_ids = _companies(staff, companies)
-    password = _password()
-    for n, company_id in enumerate(_assign(company_ids, n_drivers, companies)):
+    logins["owners"] += company_ids["new_owners"]
+    logins_file.write_text(json.dumps(logins, indent=2))
+    print(f"Logins saved in {logins_file}")
+
+    done = sum(1 for d in drivers.all() if d.get("demo"))
+    for n, company_id in list(enumerate(_assign(company_ids, n_drivers, companies)))[done:]:
         driver_id, style = f"u{secrets.token_hex(4)}", rng.choice(list(STYLES), p=[s["share"] for s in STYLES.values()])
+        trips = [finish_trip(*_drive(_route(rng), STYLES[style], _start_time(rng), rng)) for _ in range(trips_per_driver)]
         first, last = rng.choice(FIRST_NAMES), rng.choice(LAST_NAMES)
-        drivers.add(f"{first.lower()}.{last.lower()}{n + 1}@example.com", password, name=f"{first} {last}", driver_id=driver_id,
-                    company_id=company_id)
+        drivers.add(f"{first.lower()}.{last.lower()}{n + 1}@example.com", logins["driver_password"], name=f"{first} {last}",
+                    driver_id=driver_id, company_id=company_id, demo=True)
         phone = dict(zip(("device", "platform"), PHONES[rng.integers(len(PHONES))]))
-        for _ in range(trips_per_driver):
-            trip = finish_trip(*_drive(_route(rng), STYLES[style], _start_time(rng), rng))
+        for trip in trips:
             if trip.flag is None and not store.exists(store.trip_id(driver_id, trip)):
                 store.save(driver_id, trip, "sensorlogger", {"style": style}, phone)
         print(f"driver {n + 1}/{n_drivers} ({style})")
     print("Tagging road, time and weather…")
-    tag_all(store, lambda lat, lon: _near(city_ways, lat, lon))
-    return {"driver_password": password, "owners": company_ids["new_owners"]}
+    tag_all(store, lambda lat, lon: _near(city_ways, lat, lon) if _inside(ROADS_BOX, lat, lon) else fetch_roads(lat, lon))
+    return logins
 
 
 def _companies(staff: Accounts, companies: Companies) -> dict:
@@ -124,6 +134,12 @@ def _city_roads() -> list[dict]:
         lats, lons = [p["lat"] for p in way["geometry"]], [p["lon"] for p in way["geometry"]]
         way["box"] = (min(lats), min(lons), max(lats), max(lons))
     return ways
+
+
+def _inside(box: tuple, lat: np.ndarray, lon: np.ndarray) -> bool:
+    """The whole trip is inside box (south, west, north, east): the London road download covers it."""
+    south, west, north, east = box
+    return bool(lat.min() >= south and lat.max() <= north and lon.min() >= west and lon.max() <= east)
 
 
 def _near(ways: list[dict], lat: np.ndarray, lon: np.ndarray, pad: float = 0.001) -> list[dict]:
