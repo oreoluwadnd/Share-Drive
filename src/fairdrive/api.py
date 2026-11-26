@@ -77,6 +77,7 @@ app = FastAPI(title="FairDrive", description="Driving scores that judge you agai
 # The web dashboard is served from another port. Calls carry a bearer token, not cookies, so any origin is safe.
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 _cache: dict[tuple, pd.DataFrame] = {}
+_scoring = threading.Lock()
 STAFF_SESSION_SECONDS = 12 * 3600
 INVITE_SECONDS = 7 * 24 * 3600
 DRIVER_SESSION_SECONDS = 90 * 24 * 3600
@@ -500,13 +501,18 @@ def _why_not_scored(details: dict) -> str:
 
 
 def _scores() -> pd.DataFrame:
-    """Scores for every trip, recomputed only when a trip or the model changes."""
-    files = sorted(store.trips_dir.glob("*")) + sorted(model_dir(store).glob("*"))
-    key = tuple((f.name, f.stat().st_mtime_ns) for f in files)
-    if key not in _cache:
-        _cache.clear()
-        try:
-            _cache[key] = score_trips(store)
-        except NotEnoughTrips:
-            _cache[key] = pd.DataFrame(columns=["trip_id"])
-    return _cache[key]
+    """Scores for every trip, recomputed only when a trip or the model changes.
+
+    One computation at a time: requests that arrive while scores are being worked out (or during the
+    start-up warm-up) wait for it and use its result instead of starting their own.
+    """
+    with _scoring:
+        files = sorted(store.trips_dir.glob("*")) + sorted(model_dir(store).glob("*"))
+        key = tuple((f.name, f.stat().st_mtime_ns) for f in files)
+        if key not in _cache:
+            _cache.clear()
+            try:
+                _cache[key] = score_trips(store)
+            except NotEnoughTrips:
+                _cache[key] = pd.DataFrame(columns=["trip_id"])
+        return _cache[key]

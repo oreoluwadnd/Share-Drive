@@ -64,3 +64,18 @@ def test_scores_are_worked_out_as_the_server_starts(store, make_client):
                 break
             time.sleep(0.1)
     assert api._cache and len(next(iter(api._cache.values()))) == 36
+
+
+def test_requests_during_scoring_wait_for_it_instead_of_scoring_again(store, make_client, monkeypatch):
+    import threading
+    from fairdrive import api
+    make_client(store)
+    runs = []
+    real = api.score_trips
+    monkeypatch.setattr(api, "score_trips", lambda s: runs.append(1) or time.sleep(0.5) or real(s))
+    callers = [threading.Thread(target=api._scores) for _ in range(4)]
+    for t in callers:
+        t.start()
+    for t in callers:
+        t.join()
+    assert len(runs) == 1
