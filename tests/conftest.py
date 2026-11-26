@@ -71,25 +71,46 @@ def make_client(monkeypatch):
         from fairdrive.accounts import Accounts
         from fairdrive.sessions import Sessions
         monkeypatch.setattr(api, "store", store)
-        monkeypatch.setattr(api, "admins", Accounts(store.root / "admins.json"))
+        from fairdrive.companies import Companies, Invites
+        monkeypatch.setattr(api, "staff", Accounts(store.root / "staff.json"))
         monkeypatch.setattr(api, "drivers", Accounts(store.root / "drivers.json"))
+        monkeypatch.setattr(api, "companies", Companies(store.root / "companies.json"))
+        monkeypatch.setattr(api, "invites", Invites(store.root / "invites.json"))
         monkeypatch.setattr(api, "sessions", Sessions(store.root / "sessions.json"))
         api._cache.clear()
         return TestClient(api.app)
     return make
 
 
-def sign_up(client, name: str) -> dict:
-    """Signs up a driver called `name` and returns {"headers", "driver"}."""
-    response = client.post("/auth/signup", json={"name": name, "email": f"{name.lower()}@example.com", "password": PASSWORD})
+def add_company(name: str = "Acme Insurance", status: str = "approved") -> str:
+    """An insurance company with an owner (owner@<first word>.com), made directly in the store. Returns its id."""
+    from fairdrive import api
+    company_id = f"c-{name.split()[0].lower()}"
+    if company_id not in {c["company_id"] for c in api.companies.all()}:
+        api.staff.add(f"owner@{name.split()[0].lower()}.com", PASSWORD, name=f"{name} owner", role="owner", company_id=company_id)
+        api.companies.add(company_id, name)
+        api.companies.set_status(company_id, status)
+    return company_id
+
+
+def sign_up(client, name: str, company_id: str | None = None) -> dict:
+    """Signs up a driver called `name` with a company (Acme Insurance by default) and returns {"headers", "driver"}."""
+    form = {"name": name, "email": f"{name.lower()}@example.com", "password": PASSWORD, "company_id": company_id or add_company()}
+    response = client.post("/auth/signup", json=form)
     assert response.status_code == 201, response.text
     body = response.json()
     return {"headers": {"Authorization": f"Bearer {body['token']}"}, "driver": body["driver"]}
 
 
+def staff_headers(client, email: str) -> dict:
+    """Logs a staff account in and returns the headers of that session."""
+    response = client.post("/admin/login", json={"email": email, "password": PASSWORD})
+    assert response.status_code == 200, response.text
+    return {"Authorization": f"Bearer {response.json()['token']}"}
+
+
 def admin_headers(client) -> dict:
-    """Adds an admin and returns the headers of a logged-in session."""
+    """Adds a FairDrive super admin and returns the headers of a logged-in session."""
     from fairdrive import api
-    api.admins.add("admin@example.com", PASSWORD)
-    token = client.post("/admin/login", json={"email": "admin@example.com", "password": PASSWORD}).json()["token"]
-    return {"Authorization": f"Bearer {token}"}
+    api.staff.add("admin@example.com", PASSWORD, role="super", company_id=None)
+    return staff_headers(client, "admin@example.com")

@@ -217,7 +217,7 @@ function Privacy({ wide }: { wide: boolean }) {
         <View style={[s.points, wide && s.row]}>
           <Point wide={wide} title="Home and work stay private" text="The first and last 500 m of every trip are cut before anything is saved." />
           <Point wide={wide} title="No raw sensor data kept" text="Only the cleaned trip is stored, never the phone's raw readings." />
-          <Point wide={wide} title="Your trips stay yours" text="Only you see them. Delete your account and every trip goes with it." />
+          <Point wide={wide} title="Your trips stay yours" text="Only you and the insurer you chose see them. Delete your account and every trip goes with it." />
         </View>
       </View>
     </View>

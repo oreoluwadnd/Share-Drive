@@ -12,7 +12,7 @@ type State = {
   session: Session | null;
   finishOnboarding: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (name: string, email: string, password: string) => Promise<void>;
+  signUp: (name: string, email: string, password: string, companyId: string) => Promise<void>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   /** Runs an API call with the session; an expired sign-in signs the driver out instead of throwing. */
@@ -78,8 +78,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const { token, driver } = await api.signIn(email.trim(), password);
       await keep(token, driver);
     },
-    signUp: async (name, email, password) => {
-      const { token, driver } = await api.signUp(name.trim(), email.trim(), password);
+    signUp: async (name, email, password, companyId) => {
+      const { token, driver } = await api.signUp(name.trim(), email.trim(), password, companyId);
       await keep(token, driver);
     },
     signOut: async () => {

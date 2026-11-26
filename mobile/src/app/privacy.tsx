@@ -41,8 +41,9 @@ const SECTIONS: { icon: IconName; title: string; points: string[] }[] = [
     title: 'Who sees your trips',
     points: [
       'You, in this app.',
+      'The insurance company you chose when you signed up, and its team.',
       'The FairDrive team, to check that scoring is fair.',
-      'Nobody else. Your data is not sold or shared.',
+      'Nobody else. Your data is not sold or shared with anyone else.',
     ],
   },
   {
