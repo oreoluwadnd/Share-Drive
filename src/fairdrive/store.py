@@ -7,11 +7,15 @@ Layout:
 
 import json
 from pathlib import Path
+from typing import Callable, TypeVar
 
 import pandas as pd
 
 from fairdrive.geo import step_distances_m
 from fairdrive.trips import Trip
+
+T = TypeVar("T")
+_memo: dict[tuple, tuple] = {}
 
 
 class TripStore:
@@ -62,6 +66,20 @@ class TripStore:
 
     def points(self, trip_id: str) -> pd.DataFrame:
         return pd.read_parquet(self.trips_dir / f"{trip_id}.parquet")
+
+    def version(self, trip_id: str) -> tuple[int, ...]:
+        """Changes whenever the trip's files are rewritten (saved or tagged)."""
+        return tuple(p.stat().st_mtime_ns for p in sorted(self.trips_dir.glob(f"{trip_id}.*")))
+
+    def remembered(self, kind: str, trip_id: str, work: Callable[[], T]) -> T:
+        """work()'s result for this trip, worked out again only after the trip's files change.
+
+        Kept in memory for as long as the process runs (the API), one result per trip and kind.
+        """
+        key, version = (str(self.root), kind, trip_id), self.version(trip_id)
+        if _memo.get(key, (None,))[0] != version:
+            _memo[key] = (version, work())
+        return _memo[key][1]
 
     def details(self, trip_id: str) -> dict:
         return json.loads((self.trips_dir / f"{trip_id}.json").read_text())
