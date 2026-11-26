@@ -21,7 +21,7 @@ export const Wordmark = ({ light }: { light?: boolean }) => (
 /** kind sets the keyboard and what the browser offers to fill in. */
 export function Input(p: {
   label: string; value: string; onChange: (t: string) => void; placeholder: string;
-  kind: 'email' | 'password' | 'new-password' | 'name' | 'organization'; onSubmit: () => void;
+  kind: 'email' | 'password' | 'new-password' | 'name' | 'organization' | 'search'; onSubmit: () => void;
 }) {
   const [focused, setFocused] = useState(false);
   const secret = p.kind === 'password' || p.kind === 'new-password';
@@ -32,7 +32,7 @@ export function Input(p: {
         style={[s.input, focused && s.inputFocused]} value={p.value} onChangeText={p.onChange} placeholder={p.placeholder} placeholderTextColor="#A39B8D"
         autoCapitalize={p.kind === 'name' || p.kind === 'organization' ? 'words' : 'none'} autoCorrect={false}
         keyboardType={p.kind === 'email' ? 'email-address' : 'default'} secureTextEntry={secret}
-        autoComplete={p.kind === 'password' ? 'current-password' : p.kind} onSubmitEditing={p.onSubmit}
+        autoComplete={p.kind === 'password' ? 'current-password' : p.kind === 'search' ? 'off' : p.kind} onSubmitEditing={p.onSubmit}
         onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
       />
     </View>
@@ -139,6 +139,7 @@ export const s = StyleSheet.create({
   stat: { flexGrow: 1, flexBasis: 160, gap: 4, backgroundColor: C.white, borderWidth: 1, borderColor: C.line, borderRadius: 16, padding: 20 },
   statValue: f(FONT.head, { fontSize: 40, lineHeight: 46, letterSpacing: -1 }),
 
+  search: { maxWidth: 360 },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   filter: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: C.line, backgroundColor: C.white },
   filterHover: { borderColor: C.ink },

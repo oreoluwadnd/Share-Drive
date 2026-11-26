@@ -2,7 +2,7 @@
 // and team see their own drivers' trips. The FairDrive team (super admins) sees everything and approves companies.
 
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
 import {
@@ -10,7 +10,7 @@ import {
   getInvite, getTrip, listTrips, login, signUpCompany,
 } from './admin-api';
 import { CompaniesPage, DriversPage, TeamPage, useLoad } from './admin-pages';
-import { Button, FilterChip, Input, s, Stat, TextLink, WIDE, Wordmark } from './admin-ui';
+import { Button, Input, s, Stat, TextLink, WIDE, Wordmark } from './admin-ui';
 import { C, useBrandFonts } from './brand';
 import { LoggedOut } from './fairdrive';
 import { storage } from './storage';
@@ -247,12 +247,12 @@ function TopBar({ account, tabs, tab, onTab, onLogOut, onHome }: {
 
 function TripsPage({ session, onOpen, onLoggedOut }: { session: Session; onOpen: (id: string) => void; onLoggedOut: () => void }) {
   const { data: trips, error, reload } = useLoad(() => listTrips(session), onLoggedOut);
-  const [driver, setDriver] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
   const wide = useWindowDimensions().width >= WIDE;
   const company = session.account.company?.name;
 
-  const drivers = useMemo(() => [...new Set((trips ?? []).map((t) => t.driver_name))].sort(), [trips]);
-  const shown = (trips ?? []).filter((t) => driver === null || t.driver_name === driver);
+  const find = search.trim().toLowerCase();
+  const shown = (trips ?? []).filter((t) => t.driver_name.toLowerCase().includes(find));
   const scored = shown.filter((t) => t.scored);
 
   return (
@@ -277,12 +277,9 @@ function TripsPage({ session, onOpen, onLoggedOut }: { session: Session; onOpen:
             <Stat label="Average driving score" value={scored.length ? average(scored.map((t) => t.driving_score as number)).toFixed(0) : '–'} />
           </View>
 
-          {drivers.length > 1 && (
-            <View style={s.filterRow}>
-              <FilterChip label="All drivers" active={driver === null} onPress={() => setDriver(null)} />
-              {drivers.map((d) => <FilterChip key={d} label={d} active={driver === d} onPress={() => setDriver(d)} />)}
-            </View>
-          )}
+          <View style={s.search}>
+            <Input label="Find a driver" value={search} onChange={setSearch} placeholder="Type part of a name" kind="search" onSubmit={() => {}} />
+          </View>
 
           <View style={s.table}>
             {wide && (
@@ -296,7 +293,7 @@ function TripsPage({ session, onOpen, onLoggedOut }: { session: Session; onOpen:
             )}
             {shown.length === 0 && (
               <Text style={[s.muted, s.empty]}>
-                {company
+                {find ? `No driver's name contains "${search.trim()}".` : company
                   ? `No trips yet. They appear here once your customers sign up in the FairDrive app, choose ${company} and send a drive.`
                   : 'No trips yet. They appear here once drivers send them.'}
               </Text>
