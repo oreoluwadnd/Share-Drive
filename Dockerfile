@@ -15,5 +15,9 @@ COPY src ./src
 RUN uv sync --frozen --no-dev
 
 ENV PATH="/app/.venv/bin:$PATH" FAIRDRIVE_DATA=/data
+# The host reports all its processors (48 on Railway) while the app gets a small share of one. LightGBM
+# and Arrow start a worker per processor they see, and 48 workers fighting over that share made scoring
+# never finish. One worker each: scoring 300 trips' models takes under a second.
+ENV OMP_NUM_THREADS=1
 # One process only: accounts and sign-ins are files guarded by in-process locks.
 CMD ["sh", "-c", "exec uvicorn fairdrive.api:app --host 0.0.0.0 --port $PORT"]

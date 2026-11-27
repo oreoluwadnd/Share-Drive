@@ -70,6 +70,18 @@ def test_no_location_readings_says_what_to_check(tmp_path, store):
     assert not store.root.exists()
 
 
+def test_phone_that_never_moved_says_so_instead_of_crashing(tmp_path, store):
+    """iOS reports bearing -1 until the phone moves, so a recording made at a desk has no direction of travel."""
+    truth = synthetic.simulate(synthetic.stop(3))
+    records = synthetic.to_records(truth, platform="ios")
+    for r in records:
+        if r["sensor"] == "Location":
+            r["bearing"] = "-1"
+    with pytest.raises(RecordingError, match="never moved"):
+        upload(synthetic.write(records, tmp_path / "desk.json"), "ana", store)
+    assert not store.root.exists()
+
+
 def test_phone_is_unknown_when_the_file_has_no_metadata(tmp_path, store):
     truth = synthetic.simulate(synthetic.city_drive(5))
     records = [r for r in synthetic.to_records(truth) if r["sensor"] != "Metadata"]

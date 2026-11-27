@@ -7,6 +7,7 @@ import pandas as pd
 
 from fairdrive.geo import step_distances_m
 from fairdrive.orient import to_car_frame
+from fairdrive.sensorlogger import RecordingError
 
 STEP = pd.Timedelta("100ms")
 STOP_SPEED_MS = 1.0
@@ -39,6 +40,11 @@ class Trip:
 def process_recording(recording: dict[str, pd.DataFrame]) -> list[Trip]:
     gps = recording["Location"]
     gps = gps[(gps["latitude"] != 0) | (gps["longitude"] != 0)]  # 0,0 means no fix yet
+    if gps.empty:
+        raise RecordingError("The phone never got a GPS fix. Record outdoors or in the car, with Location allowed")
+    # Phones report a negative speed and bearing until they are moving (iOS: -1).
+    if not ((gps["speed"] >= 0).any() and (gps["bearing"] >= 0).any()):
+        raise RecordingError("GPS never gave a direction of travel, so the phone never moved. Record while driving")
     timeline = build_timeline(recording["Accelerometer"], recording["Gravity"], gps)
     motion_times = recording["Accelerometer"].index
     return [_make_trip(segment, gps.index, motion_times) for segment in split_trips(timeline)]
